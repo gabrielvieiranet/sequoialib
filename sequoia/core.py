@@ -681,6 +681,10 @@ class GlueClient:
             if options is None:
                 options = {}
 
+            # Configurar writer com formato e modo
+            writer = df.write.format(format_type).mode(mode)
+
+            # Aplicar opções específicas do formato
             if format_type.lower() == "csv":
                 csv_options = {
                     "header": "true",
@@ -688,20 +692,21 @@ class GlueClient:
                     "encoding": "UTF-8",
                 }
                 csv_options.update(options)
-                writer = df.write
+
                 for key, value in csv_options.items():
                     writer = writer.option(key, value)
-                writer.mode(mode).csv(file_path)
 
-            else:  # parquet (padrão)
+            elif format_type.lower() == "parquet":
                 parquet_options = {
                     "compression": "snappy",
                 }
                 parquet_options.update(options)
-                writer = df.write
+
                 for key, value in parquet_options.items():
                     writer = writer.option(key, value)
-                writer.mode(mode).parquet(file_path)
+
+            # Salvar arquivo
+            writer.save(file_path)
 
             self.logger.info(
                 f"DataFrame escrito com sucesso em {format_type}!"
