@@ -138,19 +138,8 @@ def main():
     except Exception as e:
         sq.logger.warning(f"Erro ao obter argumentos: {str(e)}")
 
-    # Exemplo 11: Job bookmarks
-    sq.logger.info("=== Exemplo 11: Job Bookmarks ===")
-
-    # Verificar se job bookmark está habilitado
-    is_enabled = sq.is_job_bookmark_enabled()
-    sq.logger.info(f"Job bookmark habilitado: {is_enabled}")
-
-    if is_enabled:
-        bookmark_state = sq.get_job_bookmark_state()
-        sq.logger.info(f"Estado do bookmark: {bookmark_state}")
-
-    # Exemplo 12: Criação de DataFrame
-    sq.logger.info("=== Exemplo 12: Criação de DataFrame ===")
+    # Exemplo 11: Criação de DataFrame
+    sq.logger.info("=== Exemplo 11: Criação de DataFrame ===")
 
     # Criar dados de exemplo
     sample_data = [
@@ -162,8 +151,8 @@ def main():
     df_sample = sq.createDataFrame(sample_data)
     sq.logger.info(f"DataFrame criado: {df_sample.count()} registros")
 
-    # Exemplo 13: SQL
-    sq.logger.info("=== Exemplo 13: Queries SQL ===")
+    # Exemplo 12: SQL
+    sq.logger.info("=== Exemplo 12: Queries SQL ===")
 
     try:
         # Executar query SQL
@@ -172,12 +161,6 @@ def main():
 
     except Exception as e:
         sq.logger.error(f"Erro na query SQL: {str(e)}")
-
-    # Exemplo 14: Otimização
-    sq.logger.info("=== Exemplo 14: Otimização ===")
-
-    df_optimized = sq.optimize_dataframe(df_sample, partition_column="idade")
-    sq.logger.info(f"DataFrame otimizado: {df_optimized.count()} registros")
 
     sq.logger.info("=== Exemplo principal concluído ===")
     sq.logger.info("✅ Todos os exemplos executados com sucesso!")

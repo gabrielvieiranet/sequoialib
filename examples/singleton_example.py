@@ -41,19 +41,8 @@ def main():
     except Exception as e:
         sq.logger.error(f"Erro ao processar dados: {str(e)}")
 
-    # Exemplo 2: Job bookmarks
-    sq.logger.info("=== Exemplo 2: Job Bookmarks ===")
-
-    # Verificar se job bookmark está habilitado
-    is_enabled = sq.is_job_bookmark_enabled()
-    sq.logger.info(f"Job bookmark habilitado: {is_enabled}")
-
-    if is_enabled:
-        bookmark_state = sq.get_job_bookmark_state()
-        sq.logger.info(f"Estado do bookmark: {bookmark_state}")
-
-    # Exemplo 3: Configurações
-    sq.logger.info("=== Exemplo 3: Configurações ===")
+    # Exemplo 2: Configurações
+    sq.logger.info("=== Exemplo 2: Configurações ===")
 
     # Obter configuração atual
     current_config = sq.get_current_config()
@@ -67,8 +56,8 @@ def main():
         }
     )
 
-    # Exemplo 4: Argumentos do job
-    sq.logger.info("=== Exemplo 4: Argumentos do Job ===")
+    # Exemplo 3: Argumentos do job
+    sq.logger.info("=== Exemplo 3: Argumentos do Job ===")
 
     try:
         # Obter argumentos
@@ -82,8 +71,8 @@ def main():
     except Exception as e:
         sq.logger.warning(f"Erro ao obter argumentos: {str(e)}")
 
-    # Exemplo 5: SQL
-    sq.logger.info("=== Exemplo 5: Queries SQL ===")
+    # Exemplo 4: SQL
+    sq.logger.info("=== Exemplo 4: Queries SQL ===")
 
     try:
         # Executar query SQL
@@ -95,8 +84,8 @@ def main():
     except Exception as e:
         sq.logger.error(f"Erro na query SQL: {str(e)}")
 
-    # Exemplo 6: Criação de DataFrame
-    sq.logger.info("=== Exemplo 6: Criação de DataFrame ===")
+    # Exemplo 5: Criação de DataFrame
+    sq.logger.info("=== Exemplo 5: Criação de DataFrame ===")
 
     # Criar dados de exemplo
     sample_data = [
@@ -108,16 +97,8 @@ def main():
     df_sample = sq.createDataFrame(sample_data)
     sq.logger.info(f"DataFrame criado: {df_sample.count()} registros")
 
-    # Exemplo 7: Otimização
-    sq.logger.info("=== Exemplo 7: Otimização ===")
-
-    df_optimized = sq.optimize_dataframe(df_sample, partition_column="idade")
-    sq.logger.info(
-        f"DataFrame otimizado com sucesso: {df_optimized.count()} registros"
-    )
-
-    # Exemplo 8: Informações da tabela
-    sq.logger.info("=== Exemplo 8: Informações da Tabela ===")
+    # Exemplo 6: Informações da tabela
+    sq.logger.info("=== Exemplo 6: Informações da Tabela ===")
 
     try:
         table_info = sq.get_table_info("database", "table")

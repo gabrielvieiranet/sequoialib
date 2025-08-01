@@ -85,17 +85,8 @@ def main():
     except Exception as e:
         sq.logger.warning(f"Erro ao obter informações: {str(e)}")
 
-    # Exemplo 6: Otimização de DataFrame
-    sq.logger.info("=== Exemplo 6: Otimização ===")
-
-    # Otimizar DataFrame
-    df_optimized = sq.optimize_dataframe(
-        df_selected, partition_column="data_criacao"
-    )
-    sq.logger.info(f"DataFrame otimizado: {df_optimized.count()} registros")
-
-    # Exemplo 7: Queries SQL
-    sq.logger.info("=== Exemplo 7: Queries SQL ===")
+    # Exemplo 6: Queries SQL
+    sq.logger.info("=== Exemplo 6: Queries SQL ===")
 
     # Executar query SQL
     df_sql = sq.sql(

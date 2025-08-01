@@ -3,7 +3,7 @@ Utilitários para operações Spark no AWS Glue
 """
 
 import sys
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from awsglue.context import GlueContext
 from pyspark.context import SparkContext
@@ -115,10 +115,32 @@ class GlueClient:
             "spark.sql.parquet.columnarReaderBatchSize": "4096",
             "spark.sql.parquet.block.size": "134217728",  # 128MB
             "spark.sql.parquet.page.size": "1048576",  # 1MB
+            "spark.parquet.enableVectorizedReader": "false",
+            "spark.parquet.writeLegacyFormat": "true",
             # Configurações de performance
             "spark.sql.adaptive.enabled": "true",
             "spark.sql.adaptive.coalescePartitions.enabled": "true",
             "spark.sql.adaptive.skewJoin.enabled": "true",
+            # Configurações de memória e execução
+            "spark.driver.maxResultSize": "4g",
+            "spark.shuffle.io.maxRetries": "10",
+            "spark.shuffle.io.retryWait": "60s",
+            "spark.reducer.maxReqsInFlight": "1",
+            "spark.executor.memoryOverhead": "2g",
+            "spark.memory.fraction": "0.6",
+            # Configurações de particionamento
+            "spark.sql.sources.partitionOverwriteMode": "dynamic",
+            # Configurações de compatibilidade de data/hora
+            "spark.sql.legacy.parquet.int96RebaseModeInRead": "CORRECTED",
+            "spark.sql.legacy.parquet.int96RebaseModeInWrite": "CORRECTED",
+            "spark.sql.legacy.parquet.datetimeRebaseModeInRead": "CORRECTED",
+            "spark.sql.legacy.parquet.datetimeRebaseModeInWrite": "CORRECTED",
+            # Configurações de JVM
+            "spark.executor.extraJavaOptions": "-XX:+UseG1GC",
+            # Configurações de timezone
+            "spark.sql.session.timeZone": "America/Sao_Paulo",
+            # Configurações de checkpoint
+            "spark.checkpoint.compress": "true",
         }
 
     def _create_optimized_spark_context(
@@ -809,83 +831,3 @@ class GlueClient:
         except Exception as e:
             self.logger.error(f"Erro ao obter informações da tabela: {str(e)}")
             raise
-
-    def optimize_dataframe(
-        self, df: DataFrame, partition_column: Optional[str] = None
-    ) -> DataFrame:
-        """
-        Aplica otimizações básicas no DataFrame
-
-        Args:
-            df: DataFrame para otimizar
-            partition_column: Coluna para particionamento (opcional)
-
-        Returns:
-            DataFrame otimizado
-        """
-        try:
-            # Cache do DataFrame se for usado múltiplas vezes
-            if df.count() < 1000000:  # Cache se menos de 1M registros
-                df = df.cache()
-                self.logger.info("DataFrame colocado em cache")
-
-            # Repartition se necessário
-            if partition_column:
-                df = df.repartition(partition_column)
-                self.logger.info(
-                    f"DataFrame reparticionado por: {partition_column}"
-                )
-
-            return df
-
-        except Exception as e:
-            self.logger.error(f"Erro ao otimizar DataFrame: {str(e)}")
-            raise
-
-    def is_job_bookmark_enabled(self) -> bool:
-        """
-        Verifica se job bookmark está habilitado
-
-        Returns:
-            True se job bookmark está habilitado
-        """
-        try:
-            # Verificar se o job foi inicializado
-            if self._job is None:
-                self.logger.warning("Job não foi inicializado")
-                return False
-
-            # Verificar se job bookmark está habilitado
-            bookmark_state = self.get_job_bookmark_state()
-            return bookmark_state.get("enabled", False)
-
-        except Exception as e:
-            self.logger.error(f"Erro ao verificar job bookmark: {str(e)}")
-            return False
-
-    def get_job_bookmark_state(self) -> Dict[str, Any]:
-        """
-        Obtém o estado atual do job bookmark
-
-        Returns:
-            Dicionário com informações do job bookmark
-        """
-        try:
-            if self._job is None:
-                return {"enabled": False, "message": "Job não inicializado"}
-
-            # Tentar obter informações do job bookmark
-            bookmark_info = {
-                "enabled": True,
-                "job_name": self.get_arg("JOB_NAME", "unknown"),
-                "run_id": getattr(self._job, "run_id", None),
-                "job_run_id": getattr(self._job, "job_run_id", None),
-            }
-
-            return bookmark_info
-
-        except Exception as e:
-            self.logger.error(
-                f"Erro ao obter estado do job bookmark: {str(e)}"
-            )
-            return {"enabled": False, "error": str(e)}

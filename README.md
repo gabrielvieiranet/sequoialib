@@ -20,7 +20,7 @@ sequoia/
 │   ├── config_examples.py          # Configurações customizadas
 │   ├── optimized_config_example.py # Configuração otimizada
 │   ├── config_error_handling_example.py  # Tratamento de erros de config
-│   ├── bookmark_example.py         # Job bookmarks
+│   ├── s3_permission_example.py    # Tratamento de permissões S3
 │   ├── file_operations_example.py  # Operações com arquivos
 │   ├── singleton_example.py        # Padrão Singleton
 │   ├── union_example.py            # UNION entre tabelas
@@ -140,7 +140,7 @@ sq = GlueClient(spark_context=sc, glue_context=glue_context, spark_session=spark
 - **Escrita de tabelas**: Apenas Parquet
 - **Otimizações de DataFrame**
 - **Informações sobre tabelas**
-- **Job Bookmarks**: `is_job_bookmark_enabled()`, `get_job_bookmark_state()`
+
 - **Controle de Job**: `job_init()`, `job_commit()` - para job bookmarks
 - **Argumentos**: `get_job_args()`, `get_arg()` - encapsulamento de argumentos
 
@@ -177,7 +177,7 @@ else:
     df = sq.read_table_from_catalog("database", "table")
 
 # Processar dados
-df_processed = sq.optimize_dataframe(df)
+df_processed = df  # DataFrame processado
 
 # Salvar resultados (Parquet ou Iceberg)
 sq.write_file(df_processed, "s3://bucket/output/")
@@ -319,17 +319,17 @@ options = {
 
 ## Job Bookmarks
 
-O Sequoia suporta detecção de job bookmarks para monitoramento:
+O Sequoia suporta controle de job para job bookmarks:
 
 ```python
-# Detectar se job bookmark está habilitado
-is_enabled = sequoia.is_job_bookmark_enabled()
-
-# Obter estado do bookmark
-bookmark_state = sequoia.get_job_bookmark_state()
+# Inicializar job (necessário para job bookmarks)
+sequoia.job_init("meu_job", args)
 
 # Ler dados normalmente
 df = sequoia.read_table("database", "table")
+
+# Finalizar job (necessário para job bookmarks)
+sequoia.job_commit()
 ```
 
 ## Controle de Job
@@ -480,6 +480,57 @@ client = GlueClient(spark_config=custom_config)
 
 # ✅ Verificar configurações aplicadas
 config = client.get_current_config()
+```
+
+## Tratamento de Erros S3
+
+O Sequoia inclui diagnóstico automático para problemas de permissão S3:
+
+### Erro Comum: AccessDenied
+
+```python
+# Erro que pode ocorrer:
+# org.apache.hadoop.fs.s3a.AWSS3IOException: 
+# com.amazonaws.services.s3.model.AmazonS3Exception: 
+# Access Denied (Service: Amazon S3; Status Code: 403)
+```
+
+### Diagnóstico Automático
+
+O método `write_file()` inclui diagnóstico automático:
+
+```python
+# Tentativa de escrita com diagnóstico
+try:
+    client.write_file(df, "s3://meu-bucket/dados.parquet")
+except Exception as e:
+    # Diagnóstico automático é logado
+    print(f"Erro: {str(e)}")
+```
+
+### Permissões IAM Necessárias
+
+Para o IAM Role do Glue:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:ListBucket",
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::meu-bucket",
+        "arn:aws:s3:::meu-bucket/*"
+      ]
+    }
+  ]
+}
 ```
 
 ## Uso Básico
