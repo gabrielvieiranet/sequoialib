@@ -41,6 +41,7 @@ def demonstrate_metadata_detection():
     print("   - detect_table_format(): Detecção Iceberg via metadados")
     print("   - Performance: ~10-50ms (100-1000x mais rápido que consulta)")
     print("   - Resultado: 'iceberg' ou 'standard'")
+    print("   - Cache: Não necessário (detecção sempre rápida)")
     print()
 
 
@@ -126,7 +127,5 @@ if __name__ == "__main__":
     demonstrate_iceberg_detection()
 
     print("=== Demonstração Concluída ===")
-    print(
-        "\n💡 Dica: Use sempre detect_table_format() para detectar Iceberg!"
-    )
+    print("\n💡 Dica: Use sempre detect_table_format() para detectar Iceberg!")
     print("   O método usa metadados para detecção ultra-rápida.")

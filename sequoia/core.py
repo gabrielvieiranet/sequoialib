@@ -49,9 +49,9 @@ class GlueClient:
         if self._initialized:
             return
 
-        # Se não fornecido, criar automaticamente
+        # Se não fornecido, criar automaticamente com configurações otimizadas
         if spark_context is None:
-            spark_context = SparkContext()
+            spark_context = self._create_optimized_spark_context(spark_config)
 
         if glue_context is None:
             glue_context = GlueContext(spark_context)
@@ -72,12 +72,6 @@ class GlueClient:
         # Logger integrado
         self.logger = Logger("GlueClient")
 
-        # Cache simples para formatos de tabela (opcional)
-        self._table_format_cache = {}
-
-        # Configurar otimizações para Parquet com KryoSerializer
-        self._configure_parquet_optimizations(spark_config)
-
         # Job instance (para job bookmarks)
         self._job = None
 
@@ -86,6 +80,81 @@ class GlueClient:
 
         # Marcar como inicializado
         self._initialized = True
+
+    def _get_default_spark_config(self) -> Dict[str, str]:
+        """
+        Retorna configurações padrão unificadas do Spark
+
+        Returns:
+            Dicionário com configurações padrão
+        """
+        return {
+            # Configurações KryoSerializer
+            "spark.serializer": "org.apache.spark.serializer.KryoSerializer",
+            "spark.kryo.registrationRequired": "false",
+            "spark.kryo.registrator": "org.apache.spark.serializer.KryoRegistrator",
+            "spark.kryo.unsafe": "true",
+            "spark.kryoserializer.buffer.max": "2047m",
+            "spark.kryoserializer.buffer": "64k",
+            # Configurações Parquet
+            "spark.sql.parquet.compression.codec": "snappy",
+            "spark.sql.parquet.mergeSchema": "false",
+            "spark.sql.parquet.filterPushdown": "true",
+            "spark.sql.parquet.columnarReaderBatchSize": "4096",
+            "spark.sql.parquet.block.size": "134217728",  # 128MB
+            "spark.sql.parquet.page.size": "1048576",  # 1MB
+            # Configurações de performance
+            "spark.sql.adaptive.enabled": "true",
+            "spark.sql.adaptive.coalescePartitions.enabled": "true",
+            "spark.sql.adaptive.skewJoin.enabled": "true",
+        }
+
+    def _create_optimized_spark_context(
+        self, custom_config: Dict[str, str] = None
+    ) -> SparkContext:
+        """
+        Cria SparkContext com configurações otimizadas
+
+        Args:
+            custom_config: Configurações customizadas (opcional)
+
+        Returns:
+            SparkContext otimizado
+        """
+        try:
+            from pyspark import SparkConf
+
+            # Obter configurações padrão
+            spark_conf = SparkConf()
+            default_config = self._get_default_spark_config()
+
+            # Aplicar configurações padrão
+            for key, value in default_config.items():
+                spark_conf.set(key, value)
+
+            # Aplicar configurações customizadas se fornecidas
+            if custom_config:
+                for key, value in custom_config.items():
+                    spark_conf.set(key, value)
+                    self.logger.info(
+                        f"Configuração customizada aplicada: {key} = {value}"
+                    )
+
+            # Criar SparkContext com configurações
+            spark_context = SparkContext(conf=spark_conf)
+
+            self.logger.info(
+                "SparkContext criado com configurações otimizadas"
+            )
+            return spark_context
+
+        except Exception as e:
+            self.logger.error(
+                f"Erro ao criar SparkContext otimizado: {str(e)}"
+            )
+            # Fallback para SparkContext padrão
+            self.logger.warning("Usando SparkContext padrão")
+            return SparkContext()
 
     def get_job_args(self, required_args: list = None) -> Dict[str, str]:
         """
@@ -176,56 +245,6 @@ class GlueClient:
             self.logger.error(f"Erro ao finalizar job: {str(e)}")
             raise
 
-    def _configure_parquet_optimizations(
-        self, custom_config: Dict[str, str] = None
-    ):
-        """
-        Configura otimizações para Parquet e KryoSerializer
-
-        Args:
-            custom_config: Configurações customizadas (opcional)
-        """
-        try:
-            # Configurações padrão para Parquet
-            parquet_config = {
-                "spark.sql.parquet.compression.codec": "snappy",
-                "spark.sql.parquet.mergeSchema": "false",
-                "spark.sql.parquet.filterPushdown": "true",
-                "spark.sql.parquet.columnarReaderBatchSize": "4096",
-                "spark.sql.parquet.block.size": "134217728",  # 128MB
-                "spark.sql.parquet.page.size": "1048576",  # 1MB
-            }
-
-            # Configurações para KryoSerializer
-            kryo_config = {
-                "spark.serializer": "org.apache.spark.serializer.KryoSerializer",
-                "spark.kryo.registrationRequired": "false",
-                "spark.kryo.registrator": "org.apache.spark.serializer.KryoRegistrator",
-                "spark.kryo.unsafe": "true",
-                "spark.kryoserializer.buffer.max": "2047m",
-                "spark.kryoserializer.buffer": "64k",
-            }
-
-            # Aplicar configurações
-            for key, value in parquet_config.items():
-                self._spark_session.conf.set(key, value)
-
-            for key, value in kryo_config.items():
-                self._spark_session.conf.set(key, value)
-
-            # Aplicar configurações customizadas se fornecidas
-            if custom_config:
-                for key, value in custom_config.items():
-                    self._spark_session.conf.set(key, value)
-
-            self.logger.info(
-                "Configurações de Parquet e KryoSerializer aplicadas"
-            )
-
-        except Exception as e:
-            self.logger.error(f"Erro ao configurar otimizações: {str(e)}")
-            raise
-
     def get_current_config(self) -> Dict[str, str]:
         """
         Obtém configurações atuais do Spark
@@ -249,17 +268,25 @@ class GlueClient:
     def update_config(self, new_config: Dict[str, str]):
         """
         Atualiza configurações do Spark dinamicamente
+        (Nota: Configurações críticas devem ser aplicadas na inicialização)
 
         Args:
             new_config: Novas configurações para aplicar
         """
         try:
             for key, value in new_config.items():
-                self._spark_session.conf.set(key, value)
-                self.logger.info(f"Configuração atualizada: {key} = {value}")
+                try:
+                    self._spark_session.conf.set(key, value)
+                    self.logger.info(
+                        f"Configuração atualizada: {key} = {value}"
+                    )
+                except Exception as e:
+                    self.logger.warning(
+                        f"Não foi possível configurar {key}: {str(e)}"
+                    )
         except Exception as e:
             self.logger.error(f"Erro ao atualizar configuração: {str(e)}")
-            raise
+            self.logger.warning("Continuando sem atualizar configurações")
 
     def read_table_from_catalog(
         self,
@@ -377,10 +404,6 @@ class GlueClient:
             Formato detectado ('iceberg', 'parquet', 'csv', etc.)
         """
         try:
-            # Cache opcional (detecção via metadados já é muito rápida)
-            cache_key = (database_name, table_name)
-            if cache_key in self._table_format_cache:
-                return self._table_format_cache[cache_key]
 
             # Importar boto3 para acessar Glue Catalog
             try:
@@ -417,14 +440,12 @@ class GlueClient:
                     self.logger.info(
                         f"Tabela {database_name}.{table_name} detectada como Iceberg via metadados"
                     )
-                    self._table_format_cache[cache_key] = "iceberg"
                     return "iceberg"
 
                 # Se não for Iceberg, usar formato padrão
                 self.logger.info(
                     f"Tabela {database_name}.{table_name} usando formato padrão"
                 )
-                self._table_format_cache[cache_key] = "standard"
                 return "standard"
 
             except ClientError as e:
@@ -851,44 +872,3 @@ class GlueClient:
                 f"Erro ao obter estado do job bookmark: {str(e)}"
             )
             return {"enabled": False, "error": str(e)}
-
-    def clear_table_format_cache(
-        self, database_name: str = None, table_name: str = None
-    ):
-        """
-        Limpa o cache de formatos de tabela (método legado)
-
-        Args:
-            database_name: Nome do banco de dados (opcional)
-            table_name: Nome da tabela (opcional)
-        """
-        try:
-            if database_name is None and table_name is None:
-                self._table_format_cache.clear()
-                self.logger.info("Cache de formatos limpo")
-            else:
-                cache_key = (database_name, table_name)
-                if cache_key in self._table_format_cache:
-                    del self._table_format_cache[cache_key]
-                    self.logger.info(
-                        f"Entrada removida do cache: {database_name}.{table_name}"
-                    )
-        except Exception as e:
-            self.logger.error(f"Erro ao limpar cache: {str(e)}")
-
-    def get_table_format_cache_info(self) -> Dict[str, Any]:
-        """
-        Obtém informações sobre o cache de formatos (método legado)
-
-        Returns:
-            Dicionário com informações do cache
-        """
-        try:
-            return {
-                "cache_size": len(self._table_format_cache),
-                "cached_tables": list(self._table_format_cache.keys()),
-                "cache_entries": dict(self._table_format_cache),
-            }
-        except Exception as e:
-            self.logger.error(f"Erro ao obter cache info: {str(e)}")
-            return {}

@@ -18,11 +18,13 @@ sequoia/
 │   ├── iceberg_example.py          # Exemplo Iceberg
 │   ├── sql_join_example.py         # Exemplo SQL
 │   ├── config_examples.py          # Configurações customizadas
+│   ├── optimized_config_example.py # Configuração otimizada
+│   ├── config_error_handling_example.py  # Tratamento de erros de config
 │   ├── bookmark_example.py         # Job bookmarks
 │   ├── file_operations_example.py  # Operações com arquivos
 │   ├── singleton_example.py        # Padrão Singleton
 │   ├── union_example.py            # UNION entre tabelas
-│   └── metadata_detection_example.py  # Detecção via metadados
+│   └── iceberg_detection_example.py  # Detecção de Iceberg
 └── docs/
     └── index.html          # Documentação HTML
 ```
@@ -400,7 +402,7 @@ O Sequoia implementa detecção de tabelas Iceberg ultra-rápida usando apenas m
 
 ## Detecção de Iceberg Otimizada
 
-Com a detecção via metadados sendo **100-1000x mais rápida**, o cache se torna opcional:
+Com a detecção via metadados sendo **100-1000x mais rápida**, não há necessidade de cache:
 
 ### Método de Detecção
 
@@ -419,14 +421,64 @@ format = sq.detect_table_format("database", "table")
 # Detecção via metadados (muito rápida)
 df1 = sq.read_table("database", "table")  # ~10-50ms
 
-# Detecção direta (sem cache necessário)
+# Detecção direta (sempre rápida)
 df2 = sq.read_table("database", "table")  # ~10-50ms
 
-# Detecção direta (sem cache necessário)
+# Detecção direta (sempre rápida)
 df3 = sq.read_table("database", "table")  # ~10-50ms
 ```
 
-**Nota**: Com detecção via metadados tão rápida, o cache se torna desnecessário na maioria dos casos.
+**Nota**: Com detecção via metadados tão rápida, não há necessidade de cache.
+
+## Configuração Otimizada do Spark
+
+O Sequoia implementa uma estratégia robusta de configuração via SparkConf:
+
+### Configurações Padrão Unificadas
+
+```python
+# Configurações aplicadas automaticamente na inicialização:
+default_config = {
+    # KryoSerializer para performance
+    "spark.serializer": "org.apache.spark.serializer.KryoSerializer",
+    "spark.kryo.registrationRequired": "false",
+    "spark.kryoserializer.buffer.max": "2047m",
+    
+    # Parquet otimizado
+    "spark.sql.parquet.compression.codec": "snappy",
+    "spark.sql.parquet.filterPushdown": "true",
+    "spark.sql.parquet.block.size": "134217728",  # 128MB
+    
+    # Performance adaptativa
+    "spark.sql.adaptive.enabled": "true",
+    "spark.sql.adaptive.coalescePartitions.enabled": "true",
+    "spark.sql.adaptive.skewJoin.enabled": "true",
+}
+```
+
+### Vantagens da Nova Estratégia
+
+- **✅ Sem erros CANNOT_MODIFY_CONFIG**: Configurações aplicadas na inicialização
+- **✅ Configurações unificadas**: Todas em um local centralizado
+- **✅ Fallback robusto**: SparkContext padrão se falhar
+- **✅ Configurações customizadas**: Suportadas via parâmetro
+
+### Uso Otimizado
+
+```python
+# ✅ Configurações otimizadas aplicadas automaticamente
+client = GlueClient()
+
+# ✅ Com configurações customizadas
+custom_config = {
+    "spark.sql.adaptive.enabled": "true",
+    "spark.sql.adaptive.coalescePartitions.enabled": "true",
+}
+client = GlueClient(spark_config=custom_config)
+
+# ✅ Verificar configurações aplicadas
+config = client.get_current_config()
+```
 
 ## Uso Básico
 
