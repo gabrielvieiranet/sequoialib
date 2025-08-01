@@ -1,0 +1,6 @@
+pyspark==3.5.0
+boto3
+awsglue3-local
+pytest
+pandas
+openpyxl

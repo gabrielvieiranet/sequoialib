@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sequoia - Documentação</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f8f9fa;
+        }
+        
+        .container {
+            display: flex;
+            min-height: 100vh;
+        }
+        
+        .sidebar {
+            width: 300px;
+            background-color: #2c3e50;
+            color: white;
+            padding: 20px;
+            overflow-y: auto;
+            position: fixed;
+            height: 100vh;
+        }
+        
+        .sidebar h2 {
+            color: #ecf0f1;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        
+        .sidebar ul {
+            list-style: none;
+        }
+        
+        .sidebar li {
+            margin-bottom: 10px;
+        }
+        
+        .sidebar a {
+            color: #bdc3c7;
+            text-decoration: none;
+            display: block;
+            padding: 8px 12px;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+        }
+        
+        .sidebar a:hover {
+            background-color: #34495e;
+            color: #3498db;
+        }
+        
+        .sidebar a.active {
+            background-color: #3498db;
+            color: white;
+        }
+        
+        .main-content {
+            flex: 1;
+            margin-left: 300px;
+            padding: 40px;
+            background-color: white;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            margin: -40px -40px 40px -40px;
+            border-radius: 0 0 20px 20px;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        
+        .section {
+            margin-bottom: 40px;
+            padding: 30px;
+            background-color: #f8f9fa;
+            border-radius: 10px;
+            border-left: 4px solid #3498db;
+        }
+        
+        .section h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+        }
+        
+        .section h3 {
+            color: #34495e;
+            margin: 25px 0 15px 0;
+            font-size: 1.4em;
+        }
+        
+        .code-block {
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 15px 0;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        
+        .method-signature {
+            background-color: #e8f4fd;
+            border: 1px solid #3498db;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 15px 0;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .parameter-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        
+        .parameter-table th,
+        .parameter-table td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        
+        .parameter-table th {
+            background-color: #3498db;
+            color: white;
+        }
+        
+        .parameter-table tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        
+        .example-box {
+            background-color: #f0f8ff;
+            border: 1px solid #87ceeb;
+            padding: 20px;
+            border-radius: 6px;
+            margin: 15px 0;
+        }
+        
+        .warning {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 15px 0;
+        }
+        
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 15px 0;
+        }
+        
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        
+        .feature-card {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-top: 4px solid #3498db;
+        }
+        
+        .feature-card h4 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        
+        .feature-card p {
+            color: #666;
+            font-size: 0.9em;
+        }
+        
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 100%;
+                position: relative;
+                height: auto;
+            }
+            
+            .main-content {
+                margin-left: 0;
+            }
+            
+            .container {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <nav class="sidebar">
+            <h2>Sequoia Docs</h2>
+            <ul>
+                <li><a href="#overview" class="active">Visão Geral</a></li>
+                <li><a href="#installation">Instalação</a></li>
+                <li><a href="#quick-start">Início Rápido</a></li>
+                <li><a href="#methods">Métodos</a></li>
+                <li><a href="#examples">Exemplos</a></li>
+                <li><a href="#configuration">Configuração</a></li>
+                <li><a href="#best-practices">Boas Práticas</a></li>
+                <li><a href="#api-reference">Referência da API</a></li>
+            </ul>
+        </nav>
+        
+        <main class="main-content">
+            <div class="header">
+                <h1>Sequoia</h1>
+                <p>Biblioteca Python para AWS Glue 5 com Spark puro e otimizações KryoSerializer</p>
+            </div>
+            
+            <section id="overview" class="section">
+                <h2>Visão Geral</h2>
+                <p>A biblioteca <strong>Sequoia</strong> é uma solução completa para desenvolvimento de jobs AWS Glue 5, oferecendo uma interface simplificada para trabalhar com Apache Spark, otimizações KryoSerializer e suporte a múltiplos formatos de dados.</p>
+                
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <h4>🚀 Performance Otimizada</h4>
+                        <p>KryoSerializer e configurações otimizadas para melhor performance</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>📊 Múltiplos Formatos</h4>
+                        <p>Suporte a Parquet, CSV e leitura de Iceberg</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>🔍 Detecção Automática</h4>
+                        <p>Detecta automaticamente o formato das tabelas</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>⚡ SQL Simplificado</h4>
+                        <p>Interface limpa para queries SQL e criação de DataFrames</p>
+                    </div>
+                </div>
+            </section>
+            
+            <section id="installation" class="section">
+                <h2>Instalação</h2>
+                <p>Instale as dependências necessárias:</p>
+                <div class="code-block">
+pip install -r requirements.txt
+                </div>
+                
+                <h3>Dependências Principais</h3>
+                <div class="code-block">
+pyspark
+boto3
+awsglue3-local
+pyiceberg
+iceberg-python
+                </div>
+            </section>
+            
+            <section id="quick-start" class="section">
+                <h2>Início Rápido</h2>
+                
+                <h3>1. Importar e Inicializar</h3>
+                <div class="code-block">
+from sequoia.core import GlueClient
+
+# Inicializar com configurações padrão
+sq = GlueClient()
+
+# Inicializar com configurações customizadas
+custom_config = {
+    "spark.sql.shuffle.partitions": "100",
+    "spark.sql.adaptive.autoBroadcastJoinThreshold": "5m"
+}
+sequoia = Sequoia(spark_config=custom_config)
+                </div>
+                
+                <h3>2. Ler Dados</h3>
+                <div class="code-block">
+# Leitura automática (detecta formato)
+df = sequoia.read_table("database", "table")
+
+# Leitura com filtros
+df = sequoia.read_table("database", "table", 
+                     columns=["id", "nome"], 
+                     where="data >= '2025-01-01'")
+                </div>
+                
+                <h3>3. Executar SQL</h3>
+                <div class="code-block">
+# Criar DataFrame
+dados = [(1, "A"), (2, "B")]
+df = sequoia.createDataFrame(dados, ["id", "nome"])
+
+# Registrar como tabela temporária
+df.createOrReplaceTempView("tabela")
+
+# Executar query
+resultado = sequoia.sql("SELECT * FROM tabela WHERE id > 1")
+                </div>
+                
+                <h3>4. Salvar Dados</h3>
+                <div class="code-block">
+# Salvar como tabela Parquet
+sequoia.write_table(df, "database", "tabela_resultado")
+
+# Salvar como arquivo
+sequoia.write_file(df, "s3://bucket/arquivo.parquet")
+sequoia.write_file(df, "s3://bucket/arquivo.csv", format_type="csv")
+                </div>
+            </section>
+            
+            <section id="methods" class="section">
+                <h2>Métodos Principais</h2>
+                
+                <h3>Leitura de Dados</h3>
+                <div class="method-signature">
+sequoia.read_table(database_name, table_name, columns=None, where=None)
+                </div>
+                <p>Lê uma tabela automaticamente detectando o formato (Parquet ou Iceberg).</p>
+                
+                <table class="parameter-table">
+                    <tr>
+                        <th>Parâmetro</th>
+                        <th>Tipo</th>
+                        <th>Descrição</th>
+                    </tr>
+                    <tr>
+                        <td>database_name</td>
+                        <td>str</td>
+                        <td>Nome do banco de dados</td>
+                    </tr>
+                    <tr>
+                        <td>table_name</td>
+                        <td>str</td>
+                        <td>Nome da tabela</td>
+                    </tr>
+                    <tr>
+                        <td>columns</td>
+                        <td>list</td>
+                        <td>Lista de colunas para selecionar (opcional)</td>
+                    </tr>
+                    <tr>
+                        <td>where</td>
+                        <td>str</td>
+                        <td>Condição WHERE para filtrar dados (opcional)</td>
+                    </tr>
+                </table>
+                
+                <h3>SQL e DataFrames</h3>
+                <div class="method-signature">
+sequoia.sql(query)
+sequoia.createDataFrame(data, schema=None, samplingRatio=None, verifySchema=True)
+                </div>
+                
+                <h3>Escrita de Dados</h3>
+                <div class="method-signature">
+sequoia.write_table(df, database_name, table_name, mode="overwrite", compression="snappy")
+sequoia.write_file(df, file_path, format_type="parquet", mode="overwrite", compression="snappy", header=True, delimiter=",")
+                </div>
+            </section>
+            
+            <section id="examples" class="section">
+                <h2>Exemplos Práticos</h2>
+                
+                <h3>Exemplo 1: Processamento Completo</h3>
+                <div class="code-block">
+# 1. Ler dados
+df = sequoia.read_table("meu_database", "minha_tabela")
+
+# 2. Criar DataFrame adicional
+dados_extra = [(1, "Info A"), (2, "Info B")]
+df_extra = sequoia.createDataFrame(dados_extra, ["id", "info"])
+
+# 3. Registrar tabelas temporárias
+df.createOrReplaceTempView("dados_originais")
+df_extra.createOrReplaceTempView("dados_extra")
+
+# 4. Executar JOIN
+query = """
+SELECT d.*, e.info
+FROM dados_originais d
+LEFT JOIN dados_extra e ON d.id = e.id
+WHERE d.status = 'ativo'
+"""
+
+resultado = sequoia.sql(query)
+
+# 5. Salvar resultado
+sequoia.write_table(resultado, "resultados", "dados_processados")
+                </div>
+                
+                <h3>Exemplo 2: Configurações Customizadas</h3>
+                <div class="code-block">
+# Configurações de performance
+config_performance = {
+    "spark.sql.shuffle.partitions": "200",
+    "spark.sql.adaptive.enabled": "true",
+    "spark.sql.adaptive.coalescePartitions.enabled": "true"
+}
+
+sequoia_perf = Sequoia(spark_config=config_performance)
+
+# Usar para processamento intensivo
+df = sequoia_perf.read_table("database", "large_table")
+resultado = df.groupBy("categoria").agg({"valor": "sum"})
+sequoia_perf.write_table(resultado, "database", "resultado_agregado")
+                </div>
+            </section>
+            
+            <section id="configuration" class="section">
+                <h2>Configuração</h2>
+                
+                <h3>Configurações Padrão</h3>
+                <p>A biblioteca aplica automaticamente as seguintes configurações:</p>
+                
+                <div class="code-block">
+# KryoSerializer
+spark.serializer = org.apache.spark.serializer.KryoSerializer
+spark.kryo.registrationRequired = false
+spark.kryo.unsafe = true
+
+# Parquet Otimizações
+spark.sql.parquet.compression.codec = snappy
+spark.sql.parquet.enableVectorizedReader = true
+spark.sql.parquet.filterPushdown = true
+
+# Performance
+spark.sql.adaptive.enabled = true
+spark.sql.shuffle.partitions = 200
+spark.sql.adaptive.autoBroadcastJoinThreshold = 10m
+                </div>
+                
+                <h3>Configurações Customizadas</h3>
+                <div class="code-block">
+# Exemplo de configuração customizada
+custom_config = {
+    "spark.sql.shuffle.partitions": "100",
+    "spark.sql.adaptive.autoBroadcastJoinThreshold": "5m",
+    "spark.sql.parquet.compression.codec": "gzip",
+    "spark.sql.catalog.glue_catalog.warehouse": "s3://meu-bucket/warehouse/"
+}
+
+sequoia = Sequoia(spark_config=custom_config)
+                </div>
+            </section>
+            
+            <section id="best-practices" class="section">
+                <h2>Boas Práticas</h2>
+                
+                <div class="success">
+                    <h4>✅ Recomendado</h4>
+                    <ul>
+                        <li>Use <code>sequoia.read_table()</code> para leitura automática</li>
+                        <li>Configure compressão adequada para seus dados</li>
+                        <li>Use filtros WHERE para reduzir processamento</li>
+                        <li>Monitore logs para otimizações</li>
+                        <li>Teste configurações em datasets pequenos primeiro</li>
+                    </ul>
+                </div>
+                
+                <div class="warning">
+                    <h4>⚠️ Atenção</h4>
+                    <ul>
+                        <li>Evite usar <code>_spark_session</code> diretamente</li>
+                        <li>Não misture diferentes instâncias de Sequoia</li>
+                        <li>Configure warehouse para leitura Iceberg</li>
+                        <li>Monitore uso de memória em datasets grandes</li>
+                    </ul>
+                </div>
+            </section>
+            
+            <section id="api-reference" class="section">
+                <h2>Referência da API</h2>
+                
+                <h3>Métodos de Leitura</h3>
+                <table class="parameter-table">
+                    <tr>
+                        <th>Método</th>
+                        <th>Descrição</th>
+                        <th>Retorno</th>
+                    </tr>
+                    <tr>
+                        <td><code>read_table()</code></td>
+                        <td>Leitura automática com detecção de formato</td>
+                        <td>DataFrame</td>
+                    </tr>
+                    <tr>
+                        <td><code>read_table_from_catalog()</code></td>
+                        <td>Leitura específica de tabelas Parquet</td>
+                        <td>DataFrame</td>
+                    </tr>
+                    <tr>
+                        <td><code>read_iceberg_table_from_catalog()</code></td>
+                        <td>Leitura específica de tabelas Iceberg</td>
+                        <td>DataFrame</td>
+                    </tr>
+                    <tr>
+                        <td><code>detect_table_format()</code></td>
+                        <td>Detecta formato da tabela</td>
+                        <td>str</td>
+                    </tr>
+                </table>
+                
+                <h3>Métodos de Escrita</h3>
+                <table class="parameter-table">
+                    <tr>
+                        <th>Método</th>
+                        <th>Descrição</th>
+                        <th>Parâmetros</th>
+                    </tr>
+                    <tr>
+                        <td><code>write_table()</code></td>
+                        <td>Salva como tabela Parquet</td>
+                        <td>df, database, table, mode, compression</td>
+                    </tr>
+                    <tr>
+                        <td><code>write_file()</code></td>
+                        <td>Salva como arquivo (Parquet/CSV)</td>
+                        <td>df, path, format_type, mode, compression</td>
+                    </tr>
+                </table>
+                
+                <h3>Métodos SQL</h3>
+                <table class="parameter-table">
+                    <tr>
+                        <th>Método</th>
+                        <th>Descrição</th>
+                        <th>Retorno</th>
+                    </tr>
+                    <tr>
+                        <td><code>sql()</code></td>
+                        <td>Executa query SQL</td>
+                        <td>DataFrame</td>
+                    </tr>
+                    <tr>
+                        <td><code>createDataFrame()</code></td>
+                        <td>Cria DataFrame</td>
+                        <td>DataFrame</td>
+                    </tr>
+                </table>
+            </section>
+        </main>
+    </div>
+    
+    <script>
+        // Smooth scrolling para links internos
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+        
+        // Atualizar link ativo no menu
+        window.addEventListener('scroll', () => {
+            const sections = document.querySelectorAll('.section');
+            const navLinks = document.querySelectorAll('.sidebar a');
+            
+            let current = '';
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop;
+                if (pageYOffset >= sectionTop - 60) {
+                    current = section.getAttribute('id');
+                }
+            });
+            
+            navLinks.forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href') === '#' + current) {
+                    link.classList.add('active');
+                }
+            });
+        });
+    </script>
+</body>
+</html> 
