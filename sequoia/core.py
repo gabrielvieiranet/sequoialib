@@ -49,15 +49,30 @@ class GlueClient:
         if self._initialized:
             return
 
+        # Logger integrado (inicializar primeiro)
+        self.logger = Logger("GlueClient")
+
         # Se não fornecido, criar automaticamente com configurações otimizadas
         if spark_context is None:
             spark_context = self._create_optimized_spark_context(spark_config)
 
         if glue_context is None:
-            glue_context = GlueContext(spark_context)
+            try:
+                glue_context = GlueContext(spark_context)
+                self.logger.info("GlueContext criado com sucesso")
+            except Exception as e:
+                self.logger.warning(f"Erro ao criar GlueContext: {str(e)}")
+                self.logger.info("Usando SparkSession diretamente")
+                glue_context = None
 
         if spark_session is None:
-            spark_session = glue_context.spark_session
+            if glue_context is not None:
+                spark_session = glue_context.spark_session
+            else:
+                # Criar SparkSession diretamente se GlueContext falhar
+                from pyspark.sql import SparkSession
+
+                spark_session = SparkSession.builder.getOrCreate()
 
         # Encapsular contextos
         self._spark_context = spark_context
@@ -68,9 +83,6 @@ class GlueClient:
         self.spark_context = spark_context
         self.glue_context = glue_context
         self.spark_session = spark_session
-
-        # Logger integrado
-        self.logger = Logger("GlueClient")
 
         # Job instance (para job bookmarks)
         self._job = None
@@ -154,7 +166,12 @@ class GlueClient:
             )
             # Fallback para SparkContext padrão
             self.logger.warning("Usando SparkContext padrão")
-            return SparkContext()
+            try:
+                return SparkContext()
+            except Exception as fallback_error:
+                self.logger.error(f"Erro no fallback: {str(fallback_error)}")
+                # Último recurso: tentar sem configurações
+                return SparkContext.getOrCreate()
 
     def get_job_args(self, required_args: list = None) -> Dict[str, str]:
         """

@@ -68,6 +68,13 @@ def demonstrate_optimized_config():
     )
     print()
 
+    # Exemplo 5: Tratamento de ambiente
+    print("5. Tratamento de ambiente:")
+    print("   - AWS Glue: GlueContext criado normalmente")
+    print("   - Ambiente local: Fallback para SparkSession")
+    print("   - Funciona em ambos os ambientes")
+    print()
+
 
 def demonstrate_config_strategy():
     """

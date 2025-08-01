@@ -462,6 +462,8 @@ default_config = {
 - **✅ Configurações unificadas**: Todas em um local centralizado
 - **✅ Fallback robusto**: SparkContext padrão se falhar
 - **✅ Configurações customizadas**: Suportadas via parâmetro
+- **✅ Compatibilidade**: Funciona em AWS Glue e ambiente local
+- **✅ Tratamento de erro**: GlueContext com fallback para SparkSession
 
 ### Uso Otimizado
 
