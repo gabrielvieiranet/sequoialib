@@ -665,7 +665,7 @@ class GlueClient:
         options: Dict[str, Any] = None,
     ) -> None:
         """
-        Escreve DataFrames em diferentes formatos (Parquet, CSV)
+        Escreve DataFrames em diferentes formatos (Parquet, CSV) usando GlueContext
 
         Args:
             df: DataFrame para escrever
@@ -681,8 +681,19 @@ class GlueClient:
             if options is None:
                 options = {}
 
-            # Configurar writer com formato e modo
-            writer = df.write.format(format_type).mode(mode)
+            # Converter DataFrame para DynamicFrame
+            dynamic_frame = (
+                self._glue_context.create_dynamic_frame.from_dataframe(
+                    df, self._spark_session
+                )
+            )
+
+            # Configurar opções de escrita
+            write_options = {
+                "path": file_path,
+                "format": format_type,
+                "mode": mode,
+            }
 
             # Aplicar opções específicas do formato
             if format_type.lower() == "csv":
@@ -692,21 +703,21 @@ class GlueClient:
                     "encoding": "UTF-8",
                 }
                 csv_options.update(options)
-
-                for key, value in csv_options.items():
-                    writer = writer.option(key, value)
+                write_options.update(csv_options)
 
             elif format_type.lower() == "parquet":
                 parquet_options = {
                     "compression": "snappy",
                 }
                 parquet_options.update(options)
+                write_options.update(parquet_options)
 
-                for key, value in parquet_options.items():
-                    writer = writer.option(key, value)
-
-            # Salvar arquivo
-            writer.save(file_path)
+            # Escrever usando GlueContext
+            self._glue_context.write_dynamic_frame.from_options(
+                frame=dynamic_frame,
+                connection_type="marketplace.spark",
+                connection_options=write_options,
+            )
 
             self.logger.info(
                 f"DataFrame escrito com sucesso em {format_type}!"
