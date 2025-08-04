@@ -101,46 +101,14 @@ class GlueClient:
             Dicionário com configurações padrão
         """
         return {
-            # Configurações KryoSerializer
             "spark.serializer": "org.apache.spark.serializer.KryoSerializer",
-            "spark.kryo.registrationRequired": "false",
-            "spark.kryo.registrator": "org.apache.spark.serializer.KryoRegistrator",
-            "spark.kryo.unsafe": "true",
-            "spark.kryoserializer.buffer.max": "2047m",
-            "spark.kryoserializer.buffer": "64k",
-            # Configurações Parquet
-            "spark.sql.parquet.compression.codec": "snappy",
-            "spark.sql.parquet.mergeSchema": "false",
-            "spark.sql.parquet.filterPushdown": "true",
-            "spark.sql.parquet.columnarReaderBatchSize": "4096",
-            "spark.sql.parquet.block.size": "134217728",  # 128MB
-            "spark.sql.parquet.page.size": "1048576",  # 1MB
-            "spark.parquet.enableVectorizedReader": "false",
-            "spark.parquet.writeLegacyFormat": "true",
-            # Configurações de performance
-            "spark.sql.adaptive.enabled": "true",
-            "spark.sql.adaptive.coalescePartitions.enabled": "true",
-            "spark.sql.adaptive.skewJoin.enabled": "true",
-            # Configurações de memória e execução
-            "spark.driver.maxResultSize": "4g",
-            "spark.shuffle.io.maxRetries": "10",
-            "spark.shuffle.io.retryWait": "60s",
-            "spark.reducer.maxReqsInFlight": "1",
-            "spark.executor.memoryOverhead": "2g",
-            "spark.memory.fraction": "0.6",
-            # Configurações de particionamento
             "spark.sql.sources.partitionOverwriteMode": "dynamic",
-            # Configurações de compatibilidade de data/hora
-            "spark.sql.legacy.parquet.int96RebaseModeInRead": "CORRECTED",
-            "spark.sql.legacy.parquet.int96RebaseModeInWrite": "CORRECTED",
-            "spark.sql.legacy.parquet.datetimeRebaseModeInRead": "CORRECTED",
-            "spark.sql.legacy.parquet.datetimeRebaseModeInWrite": "CORRECTED",
-            # Configurações de JVM
-            "spark.executor.extraJavaOptions": "-XX:+UseG1GC",
-            # Configurações de timezone
-            "spark.sql.session.timeZone": "America/Sao_Paulo",
-            # Configurações de checkpoint
-            "spark.checkpoint.compress": "true",
+            "spark.sql.parquet.int96RebaseModeInRead": "CORRECTED",
+            "spark.sql.parquet.int96RebaseModeInWrite": "CORRECTED",
+            "spark.sql.parquet.datetimeRebaseModeInRead": "CORRECTED",
+            "spark.sql.parquet.datetimeRebaseModeInWrite": "CORRECTED",
+            "hive.exec.dynamic.partition": "true",
+            "hive.exec.dynamic.partition.mode": "nonstrict",
         }
 
     def _create_optimized_spark_context(
@@ -327,7 +295,7 @@ class GlueClient:
             self.logger.error(f"Erro ao atualizar configuração: {str(e)}")
             self.logger.warning("Continuando sem atualizar configurações")
 
-    def read_table_from_catalog(
+    def read_table(
         self,
         database_name: str,
         table_name: str,
@@ -335,7 +303,7 @@ class GlueClient:
         where: str = None,
     ) -> DataFrame:
         """
-        Lê uma tabela do Glue Catalog usando Spark DataFrame
+        Lê uma tabela do catálogo usando Spark DataFrame
 
         Args:
             database_name: Nome do banco de dados
@@ -364,214 +332,6 @@ class GlueClient:
 
             df = self._spark_session.sql(query)
             return df
-
-        except Exception as e:
-            self.logger.error(
-                f"Erro ao ler tabela {database_name}.{table_name}: {str(e)}"
-            )
-            raise
-
-    def read_iceberg_table_from_catalog(
-        self,
-        database_name: str,
-        table_name: str,
-        columns: list = None,
-        where: str = None,
-    ) -> DataFrame:
-        """
-        Lê uma tabela Iceberg do Glue Catalog usando Spark DataFrame
-
-        Args:
-            database_name: Nome do banco de dados
-            table_name: Nome da tabela Iceberg
-            columns: Lista de colunas para selecionar (opcional)
-            where: Condição WHERE para filtrar dados (opcional)
-
-        Returns:
-            DataFrame com os dados da tabela Iceberg
-        """
-        try:
-            # Verificar se o warehouse do Iceberg foi configurado
-            warehouse_config = self._spark_session.conf.get(
-                "spark.sql.catalog.glue_catalog.warehouse", None
-            )
-
-            if (
-                not warehouse_config
-                or warehouse_config == "s3://your-warehouse-path/"
-            ):
-                self.logger.warning(
-                    "⚠️  ATENÇÃO: Warehouse do Iceberg não configurado! "
-                    "Configure 'spark.sql.catalog.glue_catalog.warehouse' "
-                    "com um caminho S3 válido para evitar problemas."
-                )
-
-            # Construir query SQL para Iceberg
-            if columns:
-                columns_str = ", ".join(columns)
-                query = f"SELECT {columns_str} FROM glue_catalog.{database_name}.{table_name}"
-            else:
-                query = (
-                    f"SELECT * FROM glue_catalog.{database_name}.{table_name}"
-                )
-
-            # Adicionar condição WHERE se fornecida
-            if where:
-                query += f" WHERE {where}"
-
-            self.logger.info(f"Executando query Iceberg: {query}")
-
-            df = self._spark_session.sql(query)
-            return df
-
-        except Exception as e:
-            self.logger.error(
-                f"Erro ao ler tabela Iceberg {database_name}.{table_name}: {str(e)}"
-            )
-            raise
-
-    def detect_table_format(self, database_name: str, table_name: str) -> str:
-        """
-        Detecta automaticamente o formato da tabela usando metadados do Glue Catalog
-        (muito mais eficiente que consultar dados)
-
-        Args:
-            database_name: Nome do banco de dados
-            table_name: Nome da tabela
-
-        Returns:
-            Formato detectado ('iceberg', 'parquet', 'csv', etc.)
-        """
-        try:
-
-            # Importar boto3 para acessar Glue Catalog
-            try:
-                import boto3
-                from botocore.exceptions import ClientError
-            except ImportError:
-                self.logger.error(
-                    "boto3 não disponível. Instale com: pip install boto3"
-                )
-                raise ImportError(
-                    "boto3 é necessário para detecção via metadados"
-                )
-
-            # Criar cliente Glue
-            glue_client = boto3.client("glue")
-
-            try:
-                # Obter informações da tabela do Glue Catalog
-                response = glue_client.get_table(
-                    DatabaseName=database_name, Name=table_name
-                )
-
-                table_info = response["Table"]
-
-                # Verificar propriedades da tabela para detectar Iceberg
-                table_type = table_info.get("TableType", "")
-                parameters = table_info.get("Parameters", {})
-                storage_descriptor = table_info.get("StorageDescriptor", {})
-
-                # Verificar se é tabela Iceberg
-                if self._is_iceberg_table(
-                    table_type, parameters, storage_descriptor
-                ):
-                    self.logger.info(
-                        f"Tabela {database_name}.{table_name} detectada como Iceberg via metadados"
-                    )
-                    return "iceberg"
-
-                # Se não for Iceberg, usar formato padrão
-                self.logger.info(
-                    f"Tabela {database_name}.{table_name} usando formato padrão"
-                )
-                return "standard"
-
-            except ClientError as e:
-                if e.response["Error"]["Code"] == "EntityNotFoundException":
-                    self.logger.error(
-                        f"Tabela {database_name}.{table_name} não encontrada no Glue Catalog"
-                    )
-                    raise
-                else:
-                    self.logger.error(f"Erro ao acessar metadados: {str(e)}")
-                    raise
-
-        except Exception as e:
-            self.logger.error(
-                f"Erro ao detectar formato via metadados: {str(e)}"
-            )
-            raise
-
-    def _is_iceberg_table(
-        self, table_type: str, parameters: dict, storage_descriptor: dict
-    ) -> bool:
-        """
-        Verifica se uma tabela é Iceberg baseado nos metadados
-
-        Args:
-            table_type: Tipo da tabela
-            parameters: Parâmetros da tabela
-            storage_descriptor: Descritor de armazenamento
-
-        Returns:
-            True se for tabela Iceberg
-        """
-        # Verificar propriedades específicas do Iceberg
-        iceberg_indicators = [
-            # Verificar se é tabela externa Iceberg
-            table_type == "EXTERNAL_TABLE"
-            and "iceberg" in parameters.get("table_type", "").lower(),
-            # Verificar parâmetros específicos do Iceberg
-            "iceberg.table.format-version" in parameters,
-            "iceberg.metadata.location" in parameters,
-            "iceberg.catalog" in parameters,
-            # Verificar se o input format é Iceberg
-            storage_descriptor.get("InputFormat", "").startswith(
-                "org.apache.iceberg"
-            ),
-            # Verificar se há propriedades Iceberg
-            any("iceberg" in key.lower() for key in parameters.keys()),
-            # Verificar se o serde é Iceberg
-            "iceberg"
-            in storage_descriptor.get("SerdeInfo", {})
-            .get("SerializationLibrary", "")
-            .lower(),
-        ]
-
-        return any(iceberg_indicators)
-
-    def read_table(
-        self,
-        database_name: str,
-        table_name: str,
-        columns: list = None,
-        where: str = None,
-    ) -> DataFrame:
-        """
-        Lê uma tabela do catálogo com detecção automática de formato
-
-        Args:
-            database_name: Nome do banco de dados
-            table_name: Nome da tabela
-            columns: Lista de colunas para selecionar (opcional)
-            where: Condição WHERE para filtrar dados (opcional)
-
-        Returns:
-            DataFrame com os dados da tabela
-        """
-        try:
-            # Detecção direta via metadados (já é muito rápida)
-            table_format = self.detect_table_format(database_name, table_name)
-
-            if table_format == "iceberg":
-                return self.read_iceberg_table_from_catalog(
-                    database_name, table_name, columns, where
-                )
-            else:
-                return self.read_table_from_catalog(
-                    database_name, table_name, columns, where
-                )
 
         except Exception as e:
             self.logger.error(
@@ -727,7 +487,7 @@ class GlueClient:
         compression: str = "snappy",
     ) -> None:
         """
-        Escreve DataFrame como tabela no Glue Catalog
+        Escreve DataFrame como tabela no Glue Catalog usando Spark
 
         Args:
             df: DataFrame para escrever
@@ -741,18 +501,10 @@ class GlueClient:
                 f"Escrevendo DataFrame como tabela: {database_name}.{table_name}"
             )
 
-            # Escrever usando GlueContext
-            self._glue_context.write_dynamic_frame.from_options(
-                frame=self._glue_context.create_dynamic_frame.from_dataframe(
-                    df, self._spark_session
-                ),
-                connection_type="marketplace.spark",
-                connection_options={
-                    "path": f"s3://your-bucket/{database_name}/{table_name}/",
-                    "partitionKeys": [],
-                },
-                transformation_ctx=f"{table_name}_ctx",
-            )
+            # Escrever usando Spark DataFrame
+            df.write.format("parquet").mode(mode).option(
+                "compression", compression
+            ).saveAsTable(f"{database_name}.{table_name}")
 
             self.logger.info(
                 f"Tabela {database_name}.{table_name} escrita com sucesso!"
