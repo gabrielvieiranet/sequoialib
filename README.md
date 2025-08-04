@@ -171,6 +171,8 @@ df = sq.sql("""
 """)
 ```
 
+
+
 ## 🔍 Tratamento de Erros
 
 O Sequoia inclui tratamento robusto de erros:

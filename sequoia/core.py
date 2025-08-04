@@ -588,3 +588,42 @@ class GlueClient:
         except Exception as e:
             self.logger.error(f"Erro ao obter informações da tabela: {str(e)}")
             raise
+
+    def _get_aws_account(self) -> str:
+        """
+        Obtém o ID da conta AWS atual
+
+        Returns:
+            ID da conta AWS (12 dígitos)
+        """
+        try:
+            import boto3
+            from botocore.exceptions import ClientError
+
+            # Criar cliente STS para obter informações da conta
+            sts_client = boto3.client("sts")
+
+            # Obter informações da conta atual
+            response = sts_client.get_caller_identity()
+            account_id = response["Account"]
+
+            self.logger.info(f"Conta AWS atual: {account_id}")
+            return account_id
+
+        except ImportError:
+            self.logger.error(
+                "boto3 não disponível. Instale com: pip install boto3"
+            )
+            raise ImportError(
+                "boto3 é necessário para obter informações da conta AWS"
+            )
+
+        except ClientError as e:
+            self.logger.error(
+                f"Erro ao obter informações da conta AWS: {str(e)}"
+            )
+            raise
+
+        except Exception as e:
+            self.logger.error(f"Erro inesperado ao obter conta AWS: {str(e)}")
+            raise
