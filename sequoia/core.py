@@ -69,7 +69,6 @@ class GlueClient:
         if glue_context is None:
             try:
                 glue_context = GlueContext(spark_context)
-                self.logger.info("GlueContext criado com sucesso")
             except Exception as e:
                 self.logger.warning(f"Erro ao criar GlueContext: {str(e)}")
                 self.logger.info("Usando SparkSession diretamente")
@@ -155,9 +154,6 @@ class GlueClient:
             # Criar SparkContext com configurações
             spark_context = SparkContext(conf=spark_conf)
 
-            self.logger.info(
-                "SparkContext criado com configurações otimizadas"
-            )
             return spark_context
 
         except Exception as e:
@@ -282,29 +278,6 @@ class GlueClient:
             self.logger.error(f"Erro ao obter configurações: {str(e)}")
             raise
 
-    def update_config(self, new_config: Dict[str, str]):
-        """
-        Atualiza configurações do Spark dinamicamente
-        (Nota: Configurações críticas devem ser aplicadas na inicialização)
-
-        Args:
-            new_config: Novas configurações para aplicar
-        """
-        try:
-            for key, value in new_config.items():
-                try:
-                    self._spark_session.conf.set(key, value)
-                    self.logger.info(
-                        f"Configuração atualizada: {key} = {value}"
-                    )
-                except Exception as e:
-                    self.logger.warning(
-                        f"Não foi possível configurar {key}: {str(e)}"
-                    )
-        except Exception as e:
-            self.logger.error(f"Erro ao atualizar configuração: {str(e)}")
-            self.logger.warning("Continuando sem atualizar configurações")
-
     def read_table(
         self,
         database: str,
@@ -336,8 +309,6 @@ class GlueClient:
             if where:
                 query += f" WHERE {where}"
 
-            self.logger.info(f"Executando query: {query}")
-
             df = self._spark_session.sql(query)
             return df
 
@@ -365,7 +336,6 @@ class GlueClient:
             DataFrame com os dados do arquivo
         """
         try:
-            self.logger.info(f"Lendo arquivo {format_type} de: {file_path}")
             if options is None:
                 options = {}
 
@@ -416,7 +386,6 @@ class GlueClient:
                     df = df.option(key, value)
                 df = df.parquet(file_path)
 
-            self.logger.info(f"Arquivo {format_type} lido com sucesso!")
             return df
         except Exception as e:
             self.logger.error(
@@ -443,9 +412,6 @@ class GlueClient:
             options: Opções específicas do formato
         """
         try:
-            self.logger.info(
-                f"Escrevendo DataFrame em {format_type}: {file_path}"
-            )
             if options is None:
                 options = {}
 
@@ -476,10 +442,6 @@ class GlueClient:
             # Salvar arquivo
             writer.save(file_path)
 
-            self.logger.info(
-                f"DataFrame escrito com sucesso em {format_type}!"
-            )
-
         except Exception as e:
             self.logger.error(
                 f"Erro ao escrever DataFrame em {format_type}: {str(e)}"
@@ -505,16 +467,10 @@ class GlueClient:
             compression: Compressão para Parquet
         """
         try:
-            self.logger.info(
-                f"Escrevendo DataFrame como tabela: {database}.{table}"
-            )
-
             # Escrever usando Spark DataFrame
             df.write.format("parquet").mode(mode).option(
                 "compression", compression
             ).saveAsTable(f"{database}.{table}")
-
-            self.logger.info(f"Tabela {database}.{table} escrita com sucesso!")
 
         except Exception as e:
             self.logger.error(
@@ -561,36 +517,6 @@ class GlueClient:
             self.logger.error(f"Erro ao criar DataFrame: {str(e)}")
             raise
 
-    def get_table_info(self, database: str, table: str) -> Dict[str, Any]:
-        """
-        Obtém informações sobre uma tabela do Glue Catalog
-
-        Args:
-            database: Nome do banco de dados
-            table: Nome da tabela
-
-        Returns:
-            Dicionário com informações da tabela
-        """
-        try:
-            # Usar o método read_table que já tem cache de formato
-            df = self.read_table(database, table)
-
-            info = {
-                "database": database,
-                "table": table,
-                "schema": df.schema,
-                "columns": df.columns,
-                "count": df.count(),
-                "partition_columns": df.rdd.getNumPartitions(),
-            }
-
-            return info
-
-        except Exception as e:
-            self.logger.error(f"Erro ao obter informações da tabela: {str(e)}")
-            raise
-
     def get_partitions(self, database: str, table: str) -> list:
         """
         Obtém todas as partições de uma tabela
@@ -600,7 +526,7 @@ class GlueClient:
             table: Nome da tabela
 
         Returns:
-            Lista com todas as partições da tabela
+            Lista com todas as partições da tabela no formato coluna=valor
         """
         try:
             import boto3
@@ -609,20 +535,32 @@ class GlueClient:
             # Criar cliente Glue
             glue_client = boto3.client("glue")
 
+            # Obter informações da tabela para pegar as colunas de partição
+            table_response = glue_client.get_table(
+                DatabaseName=database, TableName=table
+            )
+            partition_keys = table_response["Table"].get("PartitionKeys", [])
+            partition_column_names = [key["Name"] for key in partition_keys]
+
             # Obter partições da tabela
             response = glue_client.get_partitions(
                 DatabaseName=database, TableName=table
             )
 
             partitions = response.get("Partitions", [])
-            partition_values = []
+            partition_strings = []
 
             for partition in partitions:
                 values = partition.get("Values", [])
-                if values:
-                    partition_values.append(values)
+                if values and len(values) == len(partition_column_names):
+                    # Formatar como string: coluna1=valor1,coluna2=valor2
+                    partition_parts = []
+                    for i, column_name in enumerate(partition_column_names):
+                        partition_parts.append(f"{column_name}={values[i]}")
+                    partition_str = ",".join(partition_parts)
+                    partition_strings.append(partition_str)
 
-            return partition_values
+            return partition_strings
 
         except ImportError:
             self.logger.error(
@@ -640,7 +578,7 @@ class GlueClient:
             self.logger.error(f"Erro inesperado ao obter partições: {str(e)}")
             raise
 
-    def get_last_partition(self, database: str, table: str) -> list:
+    def get_last_partition(self, database: str, table: str) -> str:
         """
         Obtém a última partição de uma tabela
 
@@ -649,7 +587,7 @@ class GlueClient:
             table: Nome da tabela
 
         Returns:
-            Lista com a última partição da tabela
+            String com a última partição da tabela no formato coluna=valor
         """
         try:
             # Obter todas as partições
@@ -659,13 +597,14 @@ class GlueClient:
                 self.logger.warning(
                     f"Nenhuma partição encontrada para {database}.{table}"
                 )
-                return []
+                return ""
 
-            # Ordenar partições (assumindo formato de data como último elemento)
-            # Exemplo: ["2024", "01", "15"] -> ordenar por data
-            sorted_partitions = sorted(
-                partitions, key=lambda x: x[-1] if x else ""
-            )
+            # Ordenar partições pelo último valor (assumindo que é a data mais recente)
+            # Exemplo: "ano=2025,mes=08,dia=05" -> ordenar por "05"
+            def get_last_value(partition):
+                return partition.split(",")[-1].split("=")[1]
+
+            sorted_partitions = sorted(partitions, key=get_last_value)
 
             last_partition = sorted_partitions[-1]
             return last_partition

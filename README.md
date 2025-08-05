@@ -74,7 +74,6 @@ df = sq.sql("SELECT * FROM database.table WHERE id > 100")
 - **`write_table()`**: Escreve DataFrames como tabelas
 
 ### Configuração
-- **`update_config()`**: Atualiza configurações Spark
 - **`get_current_config()`**: Obtém configurações atuais
 
 ### Job Management
@@ -84,7 +83,6 @@ df = sq.sql("SELECT * FROM database.table WHERE id > 100")
 ### Utilitários
 - **`sql()`**: Executa queries SQL
 - **`createDataFrame()`**: Cria DataFrames
-- **`get_table_info()`**: Obtém informações da tabela
 - **`get_partitions()`**: Obtém todas as partições de uma tabela
 - **`get_last_partition()`**: Obtém a última partição de uma tabela
 
