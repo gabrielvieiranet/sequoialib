@@ -542,23 +542,28 @@ class GlueClient:
             partition_keys = table_response["Table"].get("PartitionKeys", [])
             partition_column_names = [key["Name"] for key in partition_keys]
 
-            # Obter partições da tabela
-            response = glue_client.get_partitions(
-                DatabaseName=database, TableName=table
-            )
-
-            partitions = response.get("Partitions", [])
+            # Obter partições da tabela usando paginação
             partition_strings = []
+            paginator = glue_client.get_paginator("get_partitions")
 
-            for partition in partitions:
-                values = partition.get("Values", [])
-                if values and len(values) == len(partition_column_names):
-                    # Formatar como string: coluna1=valor1,coluna2=valor2
-                    partition_parts = []
-                    for i, column_name in enumerate(partition_column_names):
-                        partition_parts.append(f"{column_name}={values[i]}")
-                    partition_str = ",".join(partition_parts)
-                    partition_strings.append(partition_str)
+            for page in paginator.paginate(
+                DatabaseName=database, TableName=table
+            ):
+                partitions = page.get("Partitions", [])
+
+                for partition in partitions:
+                    values = partition.get("Values", [])
+                    if values and len(values) == len(partition_column_names):
+                        # Formatar como string: coluna1=valor1,coluna2=valor2
+                        partition_parts = []
+                        for i, column_name in enumerate(
+                            partition_column_names
+                        ):
+                            partition_parts.append(
+                                f"{column_name}={values[i]}"
+                            )
+                        partition_str = ",".join(partition_parts)
+                        partition_strings.append(partition_str)
 
             return partition_strings
 
