@@ -535,37 +535,27 @@ class GlueClient:
             # Criar cliente Glue
             glue_client = boto3.client("glue")
 
-            # Obter informações da tabela para pegar as colunas de partição
-            table_response = glue_client.get_table(
+            # Obter partições da tabela
+            response = glue_client.get_partitions(
                 DatabaseName=database, TableName=table
             )
-            partition_keys = table_response["Table"].get("PartitionKeys", [])
-            partition_column_names = [key["Name"] for key in partition_keys]
 
-            # Obter partições da tabela usando paginação
-            partition_strings = []
-            paginator = glue_client.get_paginator("get_partitions")
+            # Ordenar partições em ordem decrescente
+            sorted_partitions = sorted(
+                response.get("Partitions", []), reverse=True
+            )
 
-            for page in paginator.paginate(
-                DatabaseName=database, TableName=table
-            ):
-                partitions = page.get("Partitions", [])
+            # Array vazio para retorno
+            partition_paths = []
 
-                for partition in partitions:
-                    values = partition.get("Values", [])
-                    if values and len(values) == len(partition_column_names):
-                        # Formatar como string: coluna1=valor1,coluna2=valor2
-                        partition_parts = []
-                        for i, column_name in enumerate(
-                            partition_column_names
-                        ):
-                            partition_parts.append(
-                                f"{column_name}={values[i]}"
-                            )
-                        partition_str = ",".join(partition_parts)
-                        partition_strings.append(partition_str)
+            for partition_info in sorted_partitions:
+                num_values = len(partition_info["Values"])
+                s3_location = partition_info["StorageDescriptor"]["Location"]
+                partition_path = s3_location.split("/")[-num_values::]
+                formatted_path = "/".join(partition_path)
+                partition_paths.append(formatted_path)
 
-            return partition_strings
+            return partition_paths
 
         except ImportError:
             self.logger.error(
@@ -592,10 +582,10 @@ class GlueClient:
             table: Nome da tabela
 
         Returns:
-            String com a última partição da tabela no formato coluna=valor
+            String com a última partição da tabela
         """
         try:
-            # Obter todas as partições
+            # Obter todas as partições (já ordenadas em ordem decrescente)
             partitions = self.get_partitions(database, table)
 
             if not partitions:
@@ -604,15 +594,8 @@ class GlueClient:
                 )
                 return ""
 
-            # Ordenar partições pelo último valor (assumindo que é a data mais recente)
-            # Exemplo: "ano=2025,mes=08,dia=05" -> ordenar por "05"
-            def get_last_value(partition):
-                return partition.split(",")[-1].split("=")[1]
-
-            sorted_partitions = sorted(partitions, key=get_last_value)
-
-            last_partition = sorted_partitions[-1]
-            return last_partition
+            # Retornar o primeiro item (que é a última partição devido à ordenação)
+            return partitions[0]
 
         except Exception as e:
             self.logger.error(f"Erro ao obter última partição: {str(e)}")
