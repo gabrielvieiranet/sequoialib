@@ -40,18 +40,22 @@ def main():
     df_excel_sheet = sq.read_file(
         "s3://bucket/data.xlsx",
         format_type="excel",
-        options={"sheet_name": "Planilha1"},
+        options={"sheet": "Planilha1"},
     )
-    sq.logger.info(f"Dados Excel (Planilha1): {df_excel_sheet.count()} registros")
+    sq.logger.info(
+        f"Dados Excel (Planilha1): {df_excel_sheet.count()} registros"
+    )
 
     # Ler Excel com índice de planilha
     sq.logger.info("Lendo planilha por índice...")
     df_excel_index = sq.read_file(
         "s3://bucket/data.xlsx",
         format_type="excel",
-        options={"sheet_name": 1},  # Segunda planilha
+        options={"sheet": 1},  # Segunda planilha
     )
-    sq.logger.info(f"Dados Excel (índice 1): {df_excel_index.count()} registros")
+    sq.logger.info(
+        f"Dados Excel (índice 1): {df_excel_index.count()} registros"
+    )
 
     # Exemplo 2: Escrita de diferentes formatos
     sq.logger.info("=== Exemplo 2: Escrita de Diferentes Formatos ===")

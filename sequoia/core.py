@@ -1,8 +1,13 @@
 """
 Utilitários para operações Spark no AWS Glue
+
+Autor: Gabriel Vieira
+Data: 2025
+Versão: 1.0.0
 """
 
 import sys
+import warnings
 from typing import Any, Dict
 
 from awsglue.context import GlueContext
@@ -10,6 +15,11 @@ from pyspark.context import SparkContext
 from pyspark.sql import DataFrame, SparkSession
 
 from sequoia.logger import Logger
+
+# Suprimir warnings desnecessários globalmente
+warnings.filterwarnings("ignore", category=UserWarning)
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+warnings.filterwarnings("ignore", category=FutureWarning)
 
 
 class GlueClient:
@@ -297,8 +307,8 @@ class GlueClient:
 
     def read_table(
         self,
-        database_name: str,
-        table_name: str,
+        database: str,
+        table: str,
         columns: list = None,
         where: str = None,
     ) -> DataFrame:
@@ -306,8 +316,8 @@ class GlueClient:
         Lê uma tabela do catálogo usando Spark DataFrame
 
         Args:
-            database_name: Nome do banco de dados
-            table_name: Nome da tabela
+            database: Nome do banco de dados
+            table: Nome da tabela
             columns: Lista de colunas para selecionar (opcional)
             where: Condição WHERE para filtrar dados (opcional)
 
@@ -318,11 +328,9 @@ class GlueClient:
             # Construir query SQL
             if columns:
                 columns_str = ", ".join(columns)
-                query = (
-                    f"SELECT {columns_str} FROM {database_name}.{table_name}"
-                )
+                query = f"SELECT {columns_str} FROM {database}.{table}"
             else:
-                query = f"SELECT * FROM {database_name}.{table_name}"
+                query = f"SELECT * FROM {database}.{table}"
 
             # Adicionar condição WHERE se fornecida
             if where:
@@ -335,7 +343,7 @@ class GlueClient:
 
         except Exception as e:
             self.logger.error(
-                f"Erro ao ler tabela {database_name}.{table_name}: {str(e)}"
+                f"Erro ao ler tabela {database}.{table}: {str(e)}"
             )
             raise
 
@@ -379,14 +387,14 @@ class GlueClient:
                     import pandas as pd
 
                     excel_options = {
-                        "sheet_name": 0,
+                        "sheet": 0,
                         "header": 0,
                         "engine": "openpyxl",
                     }
                     excel_options.update(options)
                     pdf = pd.read_excel(
                         file_path,
-                        sheet_name=excel_options.get("sheet_name", 0),
+                        sheet_name=excel_options.get("sheet", 0),
                         header=excel_options.get("header", 0),
                         engine=excel_options.get("engine", "openpyxl"),
                     )
@@ -481,8 +489,8 @@ class GlueClient:
     def write_table(
         self,
         df: DataFrame,
-        database_name: str,
-        table_name: str,
+        database: str,
+        table: str,
         mode: str = "overwrite",
         compression: str = "snappy",
     ) -> None:
@@ -491,28 +499,26 @@ class GlueClient:
 
         Args:
             df: DataFrame para escrever
-            database_name: Nome do banco de dados
-            table_name: Nome da tabela
+            database: Nome do banco de dados
+            table: Nome da tabela
             mode: Modo de escrita ('overwrite', 'append', 'error', 'ignore')
             compression: Compressão para Parquet
         """
         try:
             self.logger.info(
-                f"Escrevendo DataFrame como tabela: {database_name}.{table_name}"
+                f"Escrevendo DataFrame como tabela: {database}.{table}"
             )
 
             # Escrever usando Spark DataFrame
             df.write.format("parquet").mode(mode).option(
                 "compression", compression
-            ).saveAsTable(f"{database_name}.{table_name}")
+            ).saveAsTable(f"{database}.{table}")
 
-            self.logger.info(
-                f"Tabela {database_name}.{table_name} escrita com sucesso!"
-            )
+            self.logger.info(f"Tabela {database}.{table} escrita com sucesso!")
 
         except Exception as e:
             self.logger.error(
-                f"Erro ao escrever tabela {database_name}.{table_name}: {str(e)}"
+                f"Erro ao escrever tabela {database}.{table}: {str(e)}"
             )
             raise
 
@@ -527,7 +533,6 @@ class GlueClient:
             DataFrame com o resultado da query
         """
         try:
-            self.logger.info(f"Executando query SQL: {query[:100]}...")
             return self._spark_session.sql(query)
         except Exception as e:
             self.logger.error(f"Erro ao executar query SQL: {str(e)}")
@@ -549,7 +554,6 @@ class GlueClient:
             DataFrame criado
         """
         try:
-            self.logger.info("Criando DataFrame...")
             return self._spark_session.createDataFrame(
                 data, schema, samplingRatio, verifySchema
             )
@@ -557,26 +561,24 @@ class GlueClient:
             self.logger.error(f"Erro ao criar DataFrame: {str(e)}")
             raise
 
-    def get_table_info(
-        self, database_name: str, table_name: str
-    ) -> Dict[str, Any]:
+    def get_table_info(self, database: str, table: str) -> Dict[str, Any]:
         """
         Obtém informações sobre uma tabela do Glue Catalog
 
         Args:
-            database_name: Nome do banco de dados
-            table_name: Nome da tabela
+            database: Nome do banco de dados
+            table: Nome da tabela
 
         Returns:
             Dicionário com informações da tabela
         """
         try:
             # Usar o método read_table que já tem cache de formato
-            df = self.read_table(database_name, table_name)
+            df = self.read_table(database, table)
 
             info = {
-                "database": database_name,
-                "table": table_name,
+                "database": database,
+                "table": table,
                 "schema": df.schema,
                 "columns": df.columns,
                 "count": df.count(),
@@ -587,6 +589,89 @@ class GlueClient:
 
         except Exception as e:
             self.logger.error(f"Erro ao obter informações da tabela: {str(e)}")
+            raise
+
+    def get_partitions(self, database: str, table: str) -> list:
+        """
+        Obtém todas as partições de uma tabela
+
+        Args:
+            database: Nome do banco de dados
+            table: Nome da tabela
+
+        Returns:
+            Lista com todas as partições da tabela
+        """
+        try:
+            import boto3
+            from botocore.exceptions import ClientError
+
+            # Criar cliente Glue
+            glue_client = boto3.client("glue")
+
+            # Obter partições da tabela
+            response = glue_client.get_partitions(
+                DatabaseName=database, TableName=table
+            )
+
+            partitions = response.get("Partitions", [])
+            partition_values = []
+
+            for partition in partitions:
+                values = partition.get("Values", [])
+                if values:
+                    partition_values.append(values)
+
+            return partition_values
+
+        except ImportError:
+            self.logger.error(
+                "boto3 não disponível. Instale com: pip install boto3"
+            )
+            raise ImportError(
+                "boto3 é necessário para obter partições da tabela"
+            )
+
+        except ClientError as e:
+            self.logger.error(f"Erro ao obter partições da tabela: {str(e)}")
+            raise
+
+        except Exception as e:
+            self.logger.error(f"Erro inesperado ao obter partições: {str(e)}")
+            raise
+
+    def get_last_partition(self, database: str, table: str) -> list:
+        """
+        Obtém a última partição de uma tabela
+
+        Args:
+            database: Nome do banco de dados
+            table: Nome da tabela
+
+        Returns:
+            Lista com a última partição da tabela
+        """
+        try:
+            # Obter todas as partições
+            partitions = self.get_partitions(database, table)
+
+            if not partitions:
+                self.logger.warning(
+                    f"Nenhuma partição encontrada para {database}.{table}"
+                )
+                return []
+
+            # Ordenar partições (assumindo formato de data como último elemento)
+            # Exemplo: ["2024", "01", "15"] -> ordenar por data
+            sorted_partitions = sorted(
+                partitions, key=lambda x: x[-1] if x else ""
+            )
+
+            last_partition = sorted_partitions[-1]
+            return last_partition
+
+        except Exception as e:
+            self.logger.error(f"Erro ao obter última partição: {str(e)}")
             raise
 
     def _get_aws_account(self) -> str:
@@ -607,7 +692,6 @@ class GlueClient:
             response = sts_client.get_caller_identity()
             account_id = response["Account"]
 
-            self.logger.info(f"Conta AWS atual: {account_id}")
             return account_id
 
         except ImportError:

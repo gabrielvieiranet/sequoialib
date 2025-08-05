@@ -17,17 +17,17 @@ def main():
     # sq.job_init()
 
     # Obter argumentos encapsulados
-    database_name = sq.get_arg("database_name")
-    table1_name = sq.get_arg("table1_name", default="vendas_2024")
-    table2_name = sq.get_arg("table2_name", default="vendas_2025")
+    database = sq.get_arg("database")
+    table1 = sq.get_arg("table1", default="vendas_2024")
+    table2 = sq.get_arg("table2", default="vendas_2025")
     output_table = sq.get_arg("output_table", default="vendas_consolidadas")
 
     # Exemplo 1: Ler tabelas do catálogo
     # Ler primeira tabela
-    sq.read_table(database_name, table1_name)
+    sq.read_table(database, table1)
 
     # Ler segunda tabela
-    sq.read_table(database_name, table2_name)
+    sq.read_table(database, table2)
 
     # Exemplo 2: UNION via SQL
     # Query UNION simples
@@ -38,7 +38,7 @@ def main():
         valor,
         data_venda,
         '2024' as ano_origem
-    FROM {database_name}.{table1_name}
+    FROM {database}.{table1}
     
     UNION ALL
     
@@ -48,7 +48,7 @@ def main():
         valor,
         data_venda,
         '2025' as ano_origem
-    FROM {database_name}.{table2_name}
+    FROM {database}.{table2}
     
     ORDER BY data_venda DESC
     """
@@ -64,7 +64,7 @@ def main():
         valor,
         data_venda,
         '2024' as ano_origem
-    FROM {database_name}.{table1_name}
+    FROM {database}.{table1}
     WHERE valor > 100
     AND data_venda >= '2024-01-01'
     
@@ -76,7 +76,7 @@ def main():
         valor,
         data_venda,
         '2025' as ano_origem
-    FROM {database_name}.{table2_name}
+    FROM {database}.{table2}
     WHERE valor > 100
     AND data_venda >= '2025-01-01'
     
@@ -93,7 +93,7 @@ def main():
         COUNT(*) as total_vendas,
         SUM(valor) as valor_total,
         AVG(valor) as valor_medio
-    FROM {database_name}.{table1_name}
+    FROM {database}.{table1}
     WHERE data_venda >= '2024-01-01'
     
     UNION ALL
@@ -103,7 +103,7 @@ def main():
         COUNT(*) as total_vendas,
         SUM(valor) as valor_total,
         AVG(valor) as valor_medio
-    FROM {database_name}.{table2_name}
+    FROM {database}.{table2}
     WHERE data_venda >= '2025-01-01'
     
     ORDER BY ano
@@ -113,12 +113,12 @@ def main():
 
     # Exemplo 5: Gravar resultado em nova tabela
     # Gravar UNION completo
-    sq.write_table(df_union, database_name, output_table, mode="overwrite")
+    sq.write_table(df_union, database, output_table, mode="overwrite")
 
     # Gravar UNION filtrado
     sq.write_table(
         df_union_filtered,
-        database_name,
+        database,
         f"{output_table}_filtrado",
         mode="overwrite",
     )

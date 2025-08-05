@@ -27,7 +27,6 @@ sequoia/
 │   └── union_example.py
 ├── docs/
 │   └── index.html
-├── main.py
 ├── requirements.txt
 └── README.md
 ```
@@ -86,6 +85,8 @@ df = sq.sql("SELECT * FROM database.table WHERE id > 100")
 - **`sql()`**: Executa queries SQL
 - **`createDataFrame()`**: Cria DataFrames
 - **`get_table_info()`**: Obtém informações da tabela
+- **`get_partitions()`**: Obtém todas as partições de uma tabela
+- **`get_last_partition()`**: Obtém a última partição de uma tabela
 
 ## 🎯 Leitura Simplificada
 
