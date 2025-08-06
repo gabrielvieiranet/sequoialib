@@ -45,7 +45,6 @@ class GlueClient:
         glue_context: GlueContext = None,
         spark_session: SparkSession = None,
         spark_config: Dict[str, str] = None,
-        spark_catalog: str = "spark_catalog",
         region: str = "sa-east-1",
     ):
         """
@@ -65,7 +64,6 @@ class GlueClient:
         self.logger = Logger("GlueClient")
 
         # Armazenar configurações antes de usar
-        self._spark_catalog = spark_catalog
         self._region = region
 
         # Se não fornecido, criar automaticamente com configurações otimizadas
@@ -128,11 +126,11 @@ class GlueClient:
             "hive.exec.dynamic.partition": "true",
             "hive.exec.dynamic.partition.mode": "nonstrict",
             # Configurações do Iceberg
-            f"spark.sql.catalog.{self._spark_catalog}": "org.apache.iceberg.spark.SparkSessionCatalog",
-            f"spark.sql.catalog.{self._spark_catalog}.warehouse": f"s3://mybucket-{self._region}-{account_id}/iceberg/",
-            f"spark.sql.catalog.{self._spark_catalog}.glue.account-id": account_id,
-            f"spark.sql.catalog.{self._spark_catalog}.client.region": self._region,
-            f"spark.sql.catalog.{self._spark_catalog}.glue.endpoint": f"https://glue.{self._region}.amazonaws.com",
+            "spark.sql.catalog.spark_catalog": "org.apache.iceberg.spark.SparkSessionCatalog",
+            "spark.sql.catalog.spark_catalog.warehouse": f"s3://mybucket-{self._region}-{account_id}/iceberg/",
+            "spark.sql.catalog.spark_catalog.glue.account-id": account_id,
+            "spark.sql.catalog.spark_catalog.client.region": self._region,
+            "spark.sql.catalog.spark_catalog.glue.endpoint": f"https://glue.{self._region}.amazonaws.com",
         }
 
     def _create_optimized_spark_context(
@@ -553,7 +551,7 @@ class GlueClient:
             # Obter detalhes da tabela
             response = glue_client.get_table(
                 DatabaseName=database,
-                TableName=table,
+                Name=table,
             )
 
             return response["Table"]
@@ -621,15 +619,26 @@ class GlueClient:
             # Ordenar partições em ordem decrescente
             sorted_partitions = sorted(all_partitions, reverse=True)
 
-            # Processar partições para retornar Values
+            # Processar partições para retornar Values formatados
             partition_list = []
 
             for partition_info in sorted_partitions:
                 partition_values = partition_info.get("Values", [])
+
+                # Formatar partições como partition_name=partition_value
+                formatted_partitions = []
+                for i, value in enumerate(partition_values):
+                    if i < len(partition_keys):
+                        partition_name = partition_keys[i]["Name"]
+                        formatted_partitions.append(
+                            f"{partition_name}={value}"
+                        )
+
                 partition_list.append(
                     {
                         "Values": partition_values,
                         "PartitionKeys": partition_keys,
+                        "FormattedPartitions": formatted_partitions,
                         "Location": partition_info.get(
                             "StorageDescriptor", {}
                         ).get("Location", ""),
