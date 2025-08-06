@@ -8,7 +8,7 @@ Versão: 1.0.0
 
 import sys
 import warnings
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from awsglue.context import GlueContext
 from pyspark.context import SparkContext
@@ -532,7 +532,51 @@ class GlueClient:
             self.logger.error(f"Erro ao criar DataFrame: {str(e)}")
             raise
 
-    def get_partitions(self, database: str, table: str) -> list:
+    def get_table_details(self, database: str, table: str) -> Dict:
+        """
+        Obtém detalhes da tabela usando boto3
+
+        Args:
+            database: Nome do banco de dados
+            table: Nome da tabela
+
+        Returns:
+            Dicionário com detalhes da tabela
+        """
+        try:
+            import boto3
+            from botocore.exceptions import ClientError
+
+            # Criar cliente Glue
+            glue_client = boto3.client("glue", region_name=self._region)
+
+            # Obter detalhes da tabela
+            response = glue_client.get_table(
+                DatabaseName=database,
+                TableName=table,
+            )
+
+            return response["Table"]
+
+        except ImportError:
+            self.logger.error(
+                "boto3 não disponível. Instale com: pip install boto3"
+            )
+            raise ImportError(
+                "boto3 é necessário para obter detalhes da tabela"
+            )
+
+        except ClientError as e:
+            self.logger.error(f"Erro ao obter detalhes da tabela: {str(e)}")
+            raise
+
+        except Exception as e:
+            self.logger.error(
+                f"Erro inesperado ao obter detalhes da tabela: {str(e)}"
+            )
+            raise
+
+    def get_partitions(self, database: str, table: str) -> List[Dict]:
         """
         Obtém todas as partições de uma tabela usando boto3
 
@@ -541,67 +585,58 @@ class GlueClient:
             table: Nome da tabela
 
         Returns:
-            Lista com todas as partições da tabela
+            Lista de dicionários com partições da tabela
         """
         try:
-            import re
-
             import boto3
             from botocore.exceptions import ClientError
 
             # Criar cliente Glue
             glue_client = boto3.client("glue", region_name=self._region)
 
-            # Primeiro, tentar obter informações da tabela para detectar account ID
-            try:
-                table_response = glue_client.get_table(
-                    DatabaseName=database,
-                    TableName=table,
-                )
+            # Obter detalhes da tabela para PartitionKeys
+            table_details = self.get_table_details(database, table)
+            partition_keys = table_details.get("PartitionKeys", [])
 
-                # Extrair account ID do StorageDescriptor.Location
-                location = table_response["Table"]["StorageDescriptor"][
-                    "Location"
-                ]
-
-                # Padrão: s3://bucket-{region}-{account-id}/path/
-                # Exemplo: s3://mybucket-sa-east-1-123456789012/iceberg/database/table/
-                pattern = r"s3://[^/]+-([0-9]{12})/"
-                match = re.search(pattern, location)
-
-                if match:
-                    detected_account_id = match.group(1)
-                else:
-                    # Fallback: usar account ID atual
-                    detected_account_id = self._get_aws_account()
-
-            except Exception as e:
-                # Se não conseguir detectar, usar account ID atual
-                detected_account_id = self._get_aws_account()
-
-            # Obter partições da tabela com CatalogId detectado
+            # Obter partições da tabela
             response = glue_client.get_partitions(
-                CatalogId=detected_account_id,
                 DatabaseName=database,
                 TableName=table,
             )
 
-            # Ordenar partições em ordem decrescente
-            sorted_partitions = sorted(
-                response.get("Partitions", []), reverse=True
-            )
+            all_partitions = []
 
-            # Array vazio para retorno
-            partition_paths = []
+            # Processar primeira página
+            all_partitions.extend(response.get("Partitions", []))
+
+            # Processar páginas adicionais
+            while "NextToken" in response.keys():
+                response = glue_client.get_partitions(
+                    DatabaseName=database,
+                    TableName=table,
+                    NextToken=response["NextToken"],
+                )
+                all_partitions.extend(response.get("Partitions", []))
+
+            # Ordenar partições em ordem decrescente
+            sorted_partitions = sorted(all_partitions, reverse=True)
+
+            # Processar partições para retornar Values
+            partition_list = []
 
             for partition_info in sorted_partitions:
-                num_values = len(partition_info["Values"])
-                s3_location = partition_info["StorageDescriptor"]["Location"]
-                partition_path = s3_location.split("/")[-num_values::]
-                formatted_path = "/".join(partition_path)
-                partition_paths.append(formatted_path)
+                partition_values = partition_info.get("Values", [])
+                partition_list.append(
+                    {
+                        "Values": partition_values,
+                        "PartitionKeys": partition_keys,
+                        "Location": partition_info.get(
+                            "StorageDescriptor", {}
+                        ).get("Location", ""),
+                    }
+                )
 
-            return partition_paths
+            return partition_list
 
         except ImportError:
             self.logger.error(
