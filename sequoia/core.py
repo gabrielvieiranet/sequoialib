@@ -126,6 +126,8 @@ class GlueClient:
             "hive.exec.dynamic.partition": "true",
             "hive.exec.dynamic.partition.mode": "nonstrict",
             # Configurações do Iceberg
+            "spark.sql.extensions": "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions",
+            "spark.sql.iceberg.handle-timestamp-without-timezone": "true",
             "spark.sql.catalog.spark_catalog": "org.apache.iceberg.spark.SparkSessionCatalog",
             "spark.sql.catalog.spark_catalog.warehouse": f"s3://mybucket-{self._region}-{account_id}/iceberg/",
             "spark.sql.catalog.spark_catalog.glue.account-id": account_id,
@@ -634,16 +636,9 @@ class GlueClient:
                             f"{partition_name}={value}"
                         )
 
-                partition_list.append(
-                    {
-                        "Values": partition_values,
-                        "PartitionKeys": partition_keys,
-                        "FormattedPartitions": formatted_partitions,
-                        "Location": partition_info.get(
-                            "StorageDescriptor", {}
-                        ).get("Location", ""),
-                    }
-                )
+                # Juntar partições com vírgula
+                partition_string = ",".join(formatted_partitions)
+                partition_list.append(partition_string)
 
             return partition_list
 
