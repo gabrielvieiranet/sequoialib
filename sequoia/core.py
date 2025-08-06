@@ -529,24 +529,21 @@ class GlueClient:
             Lista com todas as partições da tabela
         """
         try:
-            # Query para obter partições usando GlueContext
-            query = f'SELECT * FROM "{database}"."{table}$partitions"'
-
-            # Executar query usando o SparkSession do GlueContext
-            df = self._spark_session.sql(query)
+            # Usar getPartition do GlueContext
+            partitions = self._glue_context.getPartition(database, table, [])
 
             # Converter para lista de partições
             partition_paths = []
 
-            # Obter todas as linhas
-            rows = df.collect()
-
-            for row in rows:
-                # Converter Row para lista de valores
-                values = list(row)
-                # Juntar valores com "/"
-                partition_path = "/".join(str(value) for value in values)
-                partition_paths.append(partition_path)
+            for partition in partitions:
+                # Extrair valores das partições
+                partition_values = partition.getValues()
+                if partition_values:
+                    # Juntar valores com "/"
+                    partition_path = "/".join(
+                        str(value) for value in partition_values
+                    )
+                    partition_paths.append(partition_path)
 
             # Ordenar em ordem decrescente
             partition_paths.sort(reverse=True)
