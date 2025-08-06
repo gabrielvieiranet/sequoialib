@@ -45,6 +45,8 @@ class GlueClient:
         glue_context: GlueContext = None,
         spark_session: SparkSession = None,
         spark_config: Dict[str, str] = None,
+        spark_catalog: str = "spark_catalog",
+        region: str = "sa-east-1",
     ):
         """
         Inicializa a classe GlueClient (Singleton)
@@ -99,6 +101,10 @@ class GlueClient:
         # Job arguments (obtidos automaticamente)
         self._args = None
 
+        # Configurações internas
+        self._spark_catalog = spark_catalog
+        self._region = region
+
         # Marcar como inicializado
         self._initialized = True
 
@@ -109,6 +115,9 @@ class GlueClient:
         Returns:
             Dicionário com configurações padrão
         """
+        # Obter account ID
+        account_id = self._get_aws_account()
+
         return {
             "spark.serializer": "org.apache.spark.serializer.KryoSerializer",
             "spark.sql.sources.partitionOverwriteMode": "dynamic",
@@ -118,6 +127,12 @@ class GlueClient:
             "spark.sql.parquet.datetimeRebaseModeInWrite": "CORRECTED",
             "hive.exec.dynamic.partition": "true",
             "hive.exec.dynamic.partition.mode": "nonstrict",
+            # Configurações do Iceberg
+            f"spark.sql.catalog.{self._spark_catalog}": "org.apache.iceberg.spark.SparkSessionCatalog",
+            f"spark.sql.catalog.{self._spark_catalog}.warehouse": f"s3://mybucket-{account_id}/iceberg/",
+            f"spark.sql.catalog.{self._spark_catalog}.glue.account-id": account_id,
+            f"spark.sql.catalog.{self._spark_catalog}.client.region": self._region,
+            f"spark.sql.catalog.{self._spark_catalog}.glue.endpoint": f"https://glue.{self._region}.amazonaws.com",
         }
 
     def _create_optimized_spark_context(
@@ -519,7 +534,7 @@ class GlueClient:
 
     def get_partitions(self, database: str, table: str) -> list:
         """
-        Obtém todas as partições de uma tabela usando GlueContext
+        Obtém todas as partições de uma tabela usando boto3
 
         Args:
             database: Nome do banco de dados
@@ -529,29 +544,50 @@ class GlueClient:
             Lista com todas as partições da tabela
         """
         try:
-            # Usar getPartition do GlueContext
-            partitions = self._glue_context.getPartition(database, table, [])
+            import boto3
+            from botocore.exceptions import ClientError
 
-            # Converter para lista de partições
+            # Criar cliente Glue
+            glue_client = boto3.client("glue", region_name=self._region)
+
+            # Obter partições da tabela com CatalogId
+            response = glue_client.get_partitions(
+                CatalogId=self._spark_catalog,
+                DatabaseName=database,
+                TableName=table,
+            )
+
+            # Ordenar partições em ordem decrescente
+            sorted_partitions = sorted(
+                response.get("Partitions", []), reverse=True
+            )
+
+            # Array vazio para retorno
             partition_paths = []
 
-            for partition in partitions:
-                # Extrair valores das partições
-                partition_values = partition.getValues()
-                if partition_values:
-                    # Juntar valores com "/"
-                    partition_path = "/".join(
-                        str(value) for value in partition_values
-                    )
-                    partition_paths.append(partition_path)
-
-            # Ordenar em ordem decrescente
-            partition_paths.sort(reverse=True)
+            for partition_info in sorted_partitions:
+                num_values = len(partition_info["Values"])
+                s3_location = partition_info["StorageDescriptor"]["Location"]
+                partition_path = s3_location.split("/")[-num_values::]
+                formatted_path = "/".join(partition_path)
+                partition_paths.append(formatted_path)
 
             return partition_paths
 
-        except Exception as e:
+        except ImportError:
+            self.logger.error(
+                "boto3 não disponível. Instale com: pip install boto3"
+            )
+            raise ImportError(
+                "boto3 é necessário para obter partições da tabela"
+            )
+
+        except ClientError as e:
             self.logger.error(f"Erro ao obter partições da tabela: {str(e)}")
+            raise
+
+        except Exception as e:
+            self.logger.error(f"Erro inesperado ao obter partições: {str(e)}")
             raise
 
     def get_last_partition(self, database: str, table: str) -> str:
