@@ -129,7 +129,7 @@ class GlueClient:
             "hive.exec.dynamic.partition.mode": "nonstrict",
             # Configurações do Iceberg
             f"spark.sql.catalog.{self._spark_catalog}": "org.apache.iceberg.spark.SparkSessionCatalog",
-            f"spark.sql.catalog.{self._spark_catalog}.warehouse": f"s3://mybucket-{account_id}/iceberg/",
+            f"spark.sql.catalog.{self._spark_catalog}.warehouse": f"s3://mybucket-{self._region}-{account_id}/iceberg/",
             f"spark.sql.catalog.{self._spark_catalog}.glue.account-id": account_id,
             f"spark.sql.catalog.{self._spark_catalog}.client.region": self._region,
             f"spark.sql.catalog.{self._spark_catalog}.glue.endpoint": f"https://glue.{self._region}.amazonaws.com",
@@ -544,15 +544,44 @@ class GlueClient:
             Lista com todas as partições da tabela
         """
         try:
+            import re
+
             import boto3
             from botocore.exceptions import ClientError
 
             # Criar cliente Glue
             glue_client = boto3.client("glue", region_name=self._region)
 
-            # Obter partições da tabela com CatalogId
+            # Primeiro, tentar obter informações da tabela para detectar account ID
+            try:
+                table_response = glue_client.get_table(
+                    DatabaseName=database,
+                    TableName=table,
+                )
+
+                # Extrair account ID do StorageDescriptor.Location
+                location = table_response["Table"]["StorageDescriptor"][
+                    "Location"
+                ]
+
+                # Padrão: s3://bucket-{region}-{account-id}/path/
+                # Exemplo: s3://mybucket-sa-east-1-123456789012/iceberg/database/table/
+                pattern = r"s3://[^/]+-([0-9]{12})/"
+                match = re.search(pattern, location)
+
+                if match:
+                    detected_account_id = match.group(1)
+                else:
+                    # Fallback: usar account ID atual
+                    detected_account_id = self._get_aws_account()
+
+            except Exception as e:
+                # Se não conseguir detectar, usar account ID atual
+                detected_account_id = self._get_aws_account()
+
+            # Obter partições da tabela com CatalogId detectado
             response = glue_client.get_partitions(
-                CatalogId=self._spark_catalog,
+                CatalogId=detected_account_id,
                 DatabaseName=database,
                 TableName=table,
             )
