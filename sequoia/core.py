@@ -519,58 +519,42 @@ class GlueClient:
 
     def get_partitions(self, database: str, table: str) -> list:
         """
-        Obtém todas as partições de uma tabela
+        Obtém todas as partições de uma tabela usando GlueContext
 
         Args:
             database: Nome do banco de dados
             table: Nome da tabela
 
         Returns:
-            Lista com todas as partições da tabela no formato coluna=valor
+            Lista com todas as partições da tabela
         """
         try:
-            import boto3
-            from botocore.exceptions import ClientError
+            # Query para obter partições usando GlueContext
+            query = f'SELECT * FROM "{database}"."{table}$partitions"'
 
-            # Criar cliente Glue
-            glue_client = boto3.client("glue")
+            # Executar query usando o SparkSession do GlueContext
+            df = self._spark_session.sql(query)
 
-            # Obter partições da tabela
-            response = glue_client.get_partitions(
-                DatabaseName=database, TableName=table
-            )
-
-            # Ordenar partições em ordem decrescente
-            sorted_partitions = sorted(
-                response.get("Partitions", []), reverse=True
-            )
-
-            # Array vazio para retorno
+            # Converter para lista de partições
             partition_paths = []
 
-            for partition_info in sorted_partitions:
-                num_values = len(partition_info["Values"])
-                s3_location = partition_info["StorageDescriptor"]["Location"]
-                partition_path = s3_location.split("/")[-num_values::]
-                formatted_path = "/".join(partition_path)
-                partition_paths.append(formatted_path)
+            # Obter todas as linhas
+            rows = df.collect()
+
+            for row in rows:
+                # Converter Row para lista de valores
+                values = list(row)
+                # Juntar valores com "/"
+                partition_path = "/".join(str(value) for value in values)
+                partition_paths.append(partition_path)
+
+            # Ordenar em ordem decrescente
+            partition_paths.sort(reverse=True)
 
             return partition_paths
 
-        except ImportError:
-            self.logger.error(
-                "boto3 não disponível. Instale com: pip install boto3"
-            )
-            raise ImportError(
-                "boto3 é necessário para obter partições da tabela"
-            )
-
-        except ClientError as e:
-            self.logger.error(f"Erro ao obter partições da tabela: {str(e)}")
-            raise
-
         except Exception as e:
-            self.logger.error(f"Erro inesperado ao obter partições: {str(e)}")
+            self.logger.error(f"Erro ao obter partições da tabela: {str(e)}")
             raise
 
     def get_last_partition(self, database: str, table: str) -> str:
