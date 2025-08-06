@@ -64,6 +64,10 @@ class GlueClient:
         # Logger integrado (inicializar primeiro)
         self.logger = Logger("GlueClient")
 
+        # Armazenar configurações antes de usar
+        self._spark_catalog = spark_catalog
+        self._region = region
+
         # Se não fornecido, criar automaticamente com configurações otimizadas
         if spark_context is None:
             spark_context = self._create_optimized_spark_context(spark_config)
@@ -100,10 +104,6 @@ class GlueClient:
 
         # Job arguments (obtidos automaticamente)
         self._args = None
-
-        # Configurações internas
-        self._spark_catalog = spark_catalog
-        self._region = region
 
         # Marcar como inicializado
         self._initialized = True
